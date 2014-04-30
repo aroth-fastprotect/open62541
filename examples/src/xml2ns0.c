@@ -19,8 +19,13 @@
 typedef char const * const XML_Attr_t;
 typedef char const * cstring_t;
 
-// FIXME: We might want to have these classes and their methods defined in opcua.h
-/** NodeSetAlias - a readable shortcut for References */
+// FIXME: We might want to have these classes and their methods
+// defined in opcua.h via generate_builtin and the plugin-concept
+// or in ua_basictypes.c
+
+/** UA_NodeSetAlias - a readable shortcut for NodeIds. A list of aliases
+ * is intensively used in the namespace0-xml-files
+ * */
 typedef struct UA_NodeSetAlias_T {
 	UA_String alias;
 	UA_String value;
@@ -35,7 +40,10 @@ UA_Int32 UA_NodeSetAlias_new(UA_NodeSetAlias** p) {
 	UA_NodeSetAlias_init(*p);
 	return UA_SUCCESS;
 }
-/* References */
+
+/* UA_NodeSetReferences - a surrogate we need to implement until the
+ * decodeXML-functions learn to cope with arrays
+ * */
 typedef struct UA_NodeSetReferences_T {
 	UA_Int32 size;
 	UA_ReferenceNode** references;
@@ -71,7 +79,8 @@ UA_Int32 UA_NodeSetReferences_println(cstring_t label, UA_NodeSetReferences *p) 
 	return UA_SUCCESS;
 }
 
-/* The current set of aliases */
+/** UA_NodeSetAliases - a list of aliases
+ * */
 typedef struct UA_NodeSetAliases_T {
 	UA_Int32 size;
 	UA_NodeSetAlias** aliases;
@@ -90,22 +99,22 @@ UA_Int32 UA_NodeSetAliases_println(cstring_t label, UA_NodeSetAliases *p) {
 	UA_Int32 i;
 	for (i = 0; i < p->size; i++) {
 		UA_NodeSetAlias* a = p->aliases[i];
-		printf("Alias addr=%p, ", (void*) a);
+		printf("%s{addr=%p", label, (void*) a);
 		if (a) {
-			printf("alias='%.*s', value='%.*s'", a->alias.length, a->alias.data, a->value.length, a->value.data);
+			printf(",alias='%.*s', value='%.*s'", a->alias.length, a->alias.data, a->value.length, a->value.data);
 		}
-		printf("\n");
+		printf("}\n");
 	}
 	return UA_SUCCESS;
 }
 
 /* A nodeset consist of a namespace and a list of aliases */
 typedef struct T_UA_NodeSet {
-	Namespace* ns;
+	namespace* ns;
 	UA_NodeSetAliases aliases;
 } UA_NodeSet;
 UA_Int32 UA_NodeSet_init(UA_NodeSet* p) {
-	Namespace_create(&(p->ns), 100);
+	create_ns(&(p->ns), 100);
 	p->aliases.size = -1;
 	p->aliases.aliases = UA_NULL;
 	return UA_SUCCESS;
@@ -548,6 +557,45 @@ UA_Int32 UA_NodeSetReferences_decodeXML(XML_Stack_t* s, XML_Attr_t* attr, UA_Nod
 	return UA_SUCCESS;
 }
 
+
+UA_Int32 UA_Array_decodeXML(XML_Stack_t* s, XML_Attr_t* attr, UA_Int32 type, void* dst, _Bool isStart) {
+	DBG_VERBOSE(printf("UA_Array entered with dst=%p,type=%d,isStart=%d\n", (void* ) dst, type, isStart));
+	if (isStart) {
+		if (dst == UA_NULL) {
+			UA_[type].new(&dst);
+			s->parent[s->depth - 1].children[s->parent[s->depth - 1].activeChild].obj = dst;
+		}
+		s->parent[s->depth].len = 0;
+		XML_Stack_addChildHandler(s, UA_[type].name, (XML_decoder) UA_[type].decodeXML, type, UA_NULL);
+	} else {
+		// sub element is ready, add to array
+		if (dst->size < 0 || dst->size == 0) {
+			dst->size = 1;
+			UA_alloc((void** )&(dst->references), dst->size * sizeof(UA_ReferenceNode*));
+			DBG_VERBOSE(
+					printf("allocate references:dst=%p, aliases=%p, size=%d\n", (void* )dst, (void* )(dst->references),
+							dst->size));
+		} else {
+			dst->size++;
+			dst->references = realloc(dst->references, dst->size * sizeof(UA_NodeSetAlias*));
+			DBG_VERBOSE(
+					printf("reallocate references:dst=%p, aliases=%p, size=%d\n", (void* )dst,
+							(void* )(dst->references), dst->size));
+		}
+		// index starts with 0, therefore size-1
+		DBG_VERBOSE(printf("assign alias:dst=%p, src=%p\n", (void* )dst->references[dst->size - 1], (void* )attr));
+		dst->references[dst->size - 1] = (UA_ReferenceNode*) attr;
+		// TODO: It is a design flaw that we need to do this here, isn't it?
+		DBG_VERBOSE(
+				printf("UA_NodeSetReferences clears %p\n",
+						(void* ) (s->parent[s->depth - 1].children[s->parent[s->depth - 1].activeChild].obj)));
+		s->parent[s->depth - 1].children[s->parent[s->depth - 1].activeChild].obj =
+		UA_NULL;
+	}
+	return UA_SUCCESS;
+}
+
+
 UA_Int32 UA_DataTypeNode_decodeXML(XML_Stack_t* s, XML_Attr_t* attr, UA_DataTypeNode* dst, _Bool isStart) {
 	DBG_VERBOSE(printf("UA_DataTypeNode entered with dst=%p,isStart=%d\n", (void* ) dst, isStart));
 	UA_UInt32 i;
@@ -566,6 +614,8 @@ UA_Int32 UA_DataTypeNode_decodeXML(XML_Stack_t* s, XML_Attr_t* attr, UA_DataType
 				&(dst->description));
 		XML_Stack_addChildHandler(s, "BrowseName", (XML_decoder) UA_QualifiedName_decodeXML, UA_QUALIFIEDNAME,
 				&(dst->description));
+		XML_Stack_addChildHandler(s, "IsAbstract", (XML_decoder) UA_Boolean_decodeXML, UA_BOOLEAN,
+				&(dst->description));
 		XML_Stack_addChildHandler(s, "References", (XML_decoder) UA_NodeSetReferences_decodeXML, UA_INVALIDTYPE,
 		UA_NULL);
 
@@ -577,6 +627,77 @@ UA_Int32 UA_DataTypeNode_decodeXML(XML_Stack_t* s, XML_Attr_t* attr, UA_DataType
 			if (0 == strncmp("NodeId", attr[i], strlen("NodeId"))) {
 				UA_NodeId_copycstring(attr[i + 1], &(dst->nodeId), s->aliases);
 			} else if (0 == strncmp("BrowseName", attr[i], strlen("BrowseName"))) {
+				UA_String_copycstring(attr[i + 1], &(dst->browseName.name));
+				dst->browseName.namespaceIndex = 0;
+			} else if (0 == strncmp("DisplayName", attr[i], strlen("DisplayName"))) {
+				UA_String_copycstring(attr[i + 1], &(dst->displayName.text));
+				dst->displayName.encodingMask = UA_LOCALIZEDTEXT_ENCODINGMASKTYPE_TEXT;
+			} else if (0 == strncmp("IsAbstract", attr[i], strlen("IsAbstract"))) {
+				UA_Boolean_copycstring(attr[i + 1], &(dst->isAbstract));
+				dst->displayName.encodingMask = UA_LOCALIZEDTEXT_ENCODINGMASKTYPE_TEXT;
+			} else if (0 == strncmp("Description", attr[i], strlen("Description"))) {
+				UA_String_copycstring(attr[i + 1], &(dst->description.text));
+				dst->description.encodingMask = UA_LOCALIZEDTEXT_ENCODINGMASKTYPE_TEXT;
+			} else {
+				DBG_ERR(XML_Stack_print(s));DBG_ERR(printf("%s - unknown attribute\n", attr[i]));
+			}
+		}
+	} else {
+		switch (s->parent[s->depth - 1].activeChild) {
+		case 4: // References
+		if (attr != UA_NULL) {
+			UA_NodeSetReferences* references = (UA_NodeSetReferences*) attr;
+			DBG_VERBOSE(
+					printf("finished aliases: references=%p, size=%d\n",(void*)references,(references==UA_NULL)?-1:references->size));
+			dst->referencesSize = references->size;
+			dst->references = references->references;
+		}
+			break;
+		default:
+			break;
+		}
+		// TODO: It is a design flaw that we need to do this here, isn't it?
+		DBG_VERBOSE(
+				printf("UA_DataTypeNode clears %p\n",
+						(void* ) (s->parent[s->depth - 1].children[s->parent[s->depth - 1].activeChild].obj)));
+		s->parent[s->depth - 1].children[s->parent[s->depth - 1].activeChild].obj =
+		UA_NULL;
+	}
+	return UA_SUCCESS;
+}
+
+UA_Int32 UA_ObjectNode_decodeXML(XML_Stack_t* s, XML_Attr_t* attr, UA_ObjectNode* dst, _Bool isStart) {
+	DBG_VERBOSE(printf("UA_ObjectNode entered with dst=%p,isStart=%d\n", (void* ) dst, isStart));
+	UA_UInt32 i;
+
+	if (isStart) {
+		// create a new object if called with UA_NULL
+		if (dst == UA_NULL) {
+			UA_ObjectNode_new(&dst);
+			s->parent[s->depth - 1].children[s->parent[s->depth - 1].activeChild].obj = (void*) dst;
+		}
+
+		s->parent[s->depth].len = 0;
+		XML_Stack_addChildHandler(s, "DisplayName", (XML_decoder) UA_LocalizedText_decodeXML, UA_LOCALIZEDTEXT,
+				&(dst->displayName));
+		XML_Stack_addChildHandler(s, "Description", (XML_decoder) UA_LocalizedText_decodeXML, UA_LOCALIZEDTEXT,
+				&(dst->description));
+// FIXME: no idea how to handle the SymbolicName. Seems to me that this is the "real" BrowseName
+//		XML_Stack_addChildHandler(s, "BrowseName", (XML_decoder) UA_QualifiedName_decodeXML, UA_QUALIFIEDNAME,
+//				&(dst->browseName));
+		XML_Stack_addChildHandler(s, "SymbolicName", (XML_decoder) UA_QualifiedName_decodeXML, UA_QUALIFIEDNAME,
+				&(dst->browseName));
+		XML_Stack_addChildHandler(s, "References", (XML_decoder) UA_NodeSetReferences_decodeXML, UA_INVALIDTYPE,
+		UA_NULL);
+
+		// set missing default attributes
+		dst->nodeClass = UA_NODECLASS_DATATYPE;
+
+		// set attributes
+		for (i = 0; attr[i]; i += 2) {
+			if (0 == strncmp("NodeId", attr[i], strlen("NodeId"))) {
+				UA_NodeId_copycstring(attr[i + 1], &(dst->nodeId), s->aliases);
+			} else if (0 == strncmp("SymbolicName", attr[i], strlen("SymboliName"))) {
 				UA_String_copycstring(attr[i + 1], &(dst->browseName.name));
 				dst->browseName.namespaceIndex = 0;
 			} else if (0 == strncmp("DisplayName", attr[i], strlen("DisplayName"))) {
@@ -613,24 +734,26 @@ UA_Int32 UA_DataTypeNode_decodeXML(XML_Stack_t* s, XML_Attr_t* attr, UA_DataType
 	return UA_SUCCESS;
 }
 
-UA_Int32 UA_VariableNode_decodeXML(XML_Stack_t* s, XML_Attr_t* attr, UA_VariableNode* dst, _Bool isStart) {
-	DBG_VERBOSE(printf("UA_VariableNode entered with dst=%p,isStart=%d\n", (void* ) dst, isStart));
+
+UA_Int32 UA_Variant_decodeXML(XML_Stack_t* s, XML_Attr_t* attr, UA_Variant* dst, _Bool isStart) {
+	DBG_VERBOSE(printf("UA_Variant entered with dst=%p,isStart=%d\n", (void* ) dst, isStart));
 	UA_UInt32 i;
 
 	if (isStart) {
 		// create a new object if called with UA_NULL
 		if (dst == UA_NULL) {
-			UA_VariableNode_new(&dst);
+			UA_Variant_new(&dst);
 			s->parent[s->depth - 1].children[s->parent[s->depth - 1].activeChild].obj = (void*) dst;
 		}
 
 		s->parent[s->depth].len = 0;
-		XML_Stack_addChildHandler(s, "DisplayName", (XML_decoder) UA_LocalizedText_decodeXML, UA_LOCALIZEDTEXT,
-				&(dst->displayName));
+		XML_Stack_addChildHandler(s, "ListOfExtensionObject", (XML_decoder) UA_ListOfType_decodeXML, UA_EXTENSIONOBJECT, UA_NULL);
+		XML_Stack_addChildHandler(s, "ListOfLocalizedText", (XML_decoder) UA_ListOfType_decodeXML, UA_LOCALIZEDTEXT, UA_NULL);
 		XML_Stack_addChildHandler(s, "Description", (XML_decoder) UA_LocalizedText_decodeXML, UA_LOCALIZEDTEXT,
 				&(dst->description));
-		// XML_Stack_addChildHandler(s, "DataType", (XML_decoder) UA_NodeId_decodeXML, UA_NODEID, &(dst->dataType));
+		XML_Stack_addChildHandler(s, "DataType", (XML_decoder) UA_NodeId_decodeXML, UA_NODEID, &(dst->dataType));
 		XML_Stack_addChildHandler(s, "ValueRank", (XML_decoder) UA_Int32_decodeXML, UA_INT32, &(dst->valueRank));
+		XML_Stack_addChildHandler(s, "Value", (XML_decoder) UA_Variant_decodeXML, UA_VARIANT, &(dst->value));
 		XML_Stack_addChildHandler(s, "References", (XML_decoder) UA_NodeSetReferences_decodeXML, UA_INVALIDTYPE,
 		UA_NULL);
 
@@ -657,12 +780,86 @@ UA_Int32 UA_VariableNode_decodeXML(XML_Stack_t* s, XML_Attr_t* attr, UA_Variable
 				UA_String_copycstring(attr[i + 1], &(dst->description.text));
 				dst->description.encodingMask = UA_LOCALIZEDTEXT_ENCODINGMASKTYPE_TEXT;
 			} else {
-				DBG_ERR(XML_Stack_print(s));DBG_ERR(printf("%s - unknown attribute\n", attr[i]));
+				DBG_ERR(XML_Stack_print(s));
+				DBG_ERR(printf("%s - unknown attribute\n", attr[i]));
 			}
 		}
 	} else {
 		switch (s->parent[s->depth - 1].activeChild) {
-		case 3: // References
+		case 5: // References
+		if (attr != UA_NULL) {
+			UA_NodeSetReferences* references = (UA_NodeSetReferences*) attr;
+			DBG_VERBOSE(
+					printf("finished aliases: references=%p, size=%d\n",(void*)references,(references==UA_NULL)?-1:references->size));
+			dst->referencesSize = references->size;
+			dst->references = references->references;
+		}
+			break;
+		default:
+			break;
+		}
+		// TODO: It is a design flaw that we need to do this here, isn't it?
+		DBG_VERBOSE(
+				printf("UA_DataTypeNode clears %p\n",
+						(void* ) (s->parent[s->depth - 1].children[s->parent[s->depth - 1].activeChild].obj)));
+		s->parent[s->depth - 1].children[s->parent[s->depth - 1].activeChild].obj =
+		UA_NULL;
+	}
+	return UA_SUCCESS;
+}
+
+UA_Int32 UA_VariableNode_decodeXML(XML_Stack_t* s, XML_Attr_t* attr, UA_VariableNode* dst, _Bool isStart) {
+	DBG_VERBOSE(printf("UA_VariableNode entered with dst=%p,isStart=%d\n", (void* ) dst, isStart));
+	UA_UInt32 i;
+
+	if (isStart) {
+		// create a new object if called with UA_NULL
+		if (dst == UA_NULL) {
+			UA_VariableNode_new(&dst);
+			s->parent[s->depth - 1].children[s->parent[s->depth - 1].activeChild].obj = (void*) dst;
+		}
+
+		s->parent[s->depth].len = 0;
+		XML_Stack_addChildHandler(s, "DisplayName", (XML_decoder) UA_LocalizedText_decodeXML, UA_LOCALIZEDTEXT,
+				&(dst->displayName));
+		XML_Stack_addChildHandler(s, "Description", (XML_decoder) UA_LocalizedText_decodeXML, UA_LOCALIZEDTEXT,
+				&(dst->description));0
+		XML_Stack_addChildHandler(s, "DataType", (XML_decoder) UA_NodeId_decodeXML, UA_NODEID, &(dst->dataType));
+		XML_Stack_addChildHandler(s, "ValueRank", (XML_decoder) UA_Int32_decodeXML, UA_INT32, &(dst->valueRank));
+		XML_Stack_addChildHandler(s, "Value", (XML_decoder) UA_Variant_decodeXML, UA_VARIANT, &(dst->value));
+		XML_Stack_addChildHandler(s, "References", (XML_decoder) UA_NodeSetReferences_decodeXML, UA_INVALIDTYPE,
+		UA_NULL);
+
+		// set missing default attributes
+		dst->nodeClass = UA_NODECLASS_VARIABLE;
+
+		// set attributes
+		for (i = 0; attr[i]; i += 2) {
+			if (0 == strncmp("NodeId", attr[i], strlen("NodeId"))) {
+				UA_NodeId_copycstring(attr[i + 1], &(dst->nodeId), s->aliases);
+			} else if (0 == strncmp("DataType", attr[i], strlen("DataType"))) {
+				UA_NodeId_copycstring(attr[i + 1], &(dst->dataType), s->aliases);
+			} else if (0 == strncmp("ValueRank", attr[i], strlen("ValueRank"))) {
+				dst->valueRank = atoi(attr[i + 1]);
+			} else if (0 == strncmp("ParentNodeId", attr[i], strlen("ParentNodeId"))) {
+				// FIXME: I do not know what to do with this parameter
+			} else if (0 == strncmp("BrowseName", attr[i], strlen("BrowseName"))) {
+				UA_String_copycstring(attr[i + 1], &(dst->browseName.name));
+				dst->browseName.namespaceIndex = 0;
+			} else if (0 == strncmp("DisplayName", attr[i], strlen("DisplayName"))) {
+				UA_String_copycstring(attr[i + 1], &(dst->displayName.text));
+				dst->displayName.encodingMask = UA_LOCALIZEDTEXT_ENCODINGMASKTYPE_TEXT;
+			} else if (0 == strncmp("Description", attr[i], strlen("Description"))) {
+				UA_String_copycstring(attr[i + 1], &(dst->description.text));
+				dst->description.encodingMask = UA_LOCALIZEDTEXT_ENCODINGMASKTYPE_TEXT;
+			} else {
+				DBG_ERR(XML_Stack_print(s));
+				DBG_ERR(printf("%s - unknown attribute\n", attr[i]));
+			}
+		}
+	} else {
+		switch (s->parent[s->depth - 1].activeChild) {
+		case 5: // References
 		if (attr != UA_NULL) {
 			UA_NodeSetReferences* references = (UA_NodeSetReferences*) attr;
 			DBG_VERBOSE(
@@ -820,7 +1017,7 @@ UA_Int32 UA_NodeSet_decodeXML(XML_Stack_t* s, XML_Attr_t* attr, UA_NodeSet* dst,
 		if (attr != UA_NULL) {
 			UA_Node* node = (UA_Node*) attr;
 			DBG_VERBOSE(printf("finished node: node=%p\n", (void* )node));
-			Namespace_insert(dst->ns, node);
+			insert_node(dst->ns, node);
 			DBG_VERBOSE(printf("Inserting "));DBG_VERBOSE(print_node(node));
 		}
 			break;
@@ -951,7 +1148,7 @@ int main() {
 		}
 	}
 	XML_ParserFree(parser);
-	Namespace_iterate(n.ns, print_node);
+	iterate_ns(n.ns, print_node);
 	printf("aliases addr=%p, size=%d\n", (void*) &(n.aliases), n.aliases.size);
 	UA_NodeSetAliases_println("aliases in nodeset: ", &n.aliases);
 	return 0;
