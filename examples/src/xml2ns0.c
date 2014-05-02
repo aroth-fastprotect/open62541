@@ -110,7 +110,7 @@ UA_Int32 UA_NodeSetAliases_println(cstring_t label, UA_NodeSetAliases *p) {
 
 /* A nodeset consist of a namespace and a list of aliases */
 typedef struct T_UA_NodeSet {
-	namespace* ns;
+	Namespace* ns;
 	UA_NodeSetAliases aliases;
 } UA_NodeSet;
 UA_Int32 UA_NodeSet_init(UA_NodeSet* p) {
@@ -682,9 +682,9 @@ UA_Int32 UA_ObjectNode_decodeXML(XML_Stack_t* s, XML_Attr_t* attr, UA_ObjectNode
 				&(dst->displayName));
 		XML_Stack_addChildHandler(s, "Description", (XML_decoder) UA_LocalizedText_decodeXML, UA_LOCALIZEDTEXT,
 				&(dst->description));
-// FIXME: no idea how to handle the SymbolicName. Seems to me that this is the "real" BrowseName
-//		XML_Stack_addChildHandler(s, "BrowseName", (XML_decoder) UA_QualifiedName_decodeXML, UA_QUALIFIEDNAME,
-//				&(dst->browseName));
+		// FIXME: no idea how to handle SymbolicName automatically. Seems to me that it is the "real" BrowseName
+		//		XML_Stack_addChildHandler(s, "BrowseName", (XML_decoder) UA_QualifiedName_decodeXML, UA_QUALIFIEDNAME,
+		//				&(dst->browseName));
 		XML_Stack_addChildHandler(s, "SymbolicName", (XML_decoder) UA_QualifiedName_decodeXML, UA_QUALIFIEDNAME,
 				&(dst->browseName));
 		XML_Stack_addChildHandler(s, "References", (XML_decoder) UA_NodeSetReferences_decodeXML, UA_INVALIDTYPE,
@@ -823,7 +823,7 @@ UA_Int32 UA_VariableNode_decodeXML(XML_Stack_t* s, XML_Attr_t* attr, UA_Variable
 		XML_Stack_addChildHandler(s, "DisplayName", (XML_decoder) UA_LocalizedText_decodeXML, UA_LOCALIZEDTEXT,
 				&(dst->displayName));
 		XML_Stack_addChildHandler(s, "Description", (XML_decoder) UA_LocalizedText_decodeXML, UA_LOCALIZEDTEXT,
-				&(dst->description));0
+				&(dst->description));
 		XML_Stack_addChildHandler(s, "DataType", (XML_decoder) UA_NodeId_decodeXML, UA_NODEID, &(dst->dataType));
 		XML_Stack_addChildHandler(s, "ValueRank", (XML_decoder) UA_Int32_decodeXML, UA_INT32, &(dst->valueRank));
 		XML_Stack_addChildHandler(s, "Value", (XML_decoder) UA_Variant_decodeXML, UA_VARIANT, &(dst->value));
