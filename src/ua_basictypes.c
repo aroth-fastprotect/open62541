@@ -201,6 +201,8 @@ UA_TYPE_METHOD_DELETEMEMBERS_NOACTION(UA_Byte)
 UA_TYPE_METHOD_INIT_DEFAULT(UA_Byte)
 UA_TYPE_METHOD_NEW_DEFAULT(UA_Byte)
 UA_TYPE_METHOD_COPY(UA_Byte)
+UA_TYPE_METHOD_DECODEXML_NOTIMPL(UA_Byte)
+
 UA_TYPE_METHOD_CALCSIZE_SIZEOF(UA_SByte)
 UA_TYPE_START_ENCODEBINARY(UA_SByte)
 	dst->data[(*pos)++] = *src;
@@ -213,6 +215,7 @@ UA_TYPE_METHOD_DELETEMEMBERS_NOACTION(UA_SByte)
 UA_TYPE_METHOD_INIT_DEFAULT(UA_SByte)
 UA_TYPE_METHOD_NEW_DEFAULT(UA_SByte)
 UA_TYPE_METHOD_COPY(UA_SByte)
+UA_TYPE_METHOD_DECODEXML_NOTIMPL(UA_SByte)
 
 UA_TYPE_METHOD_CALCSIZE_SIZEOF(UA_UInt16)
 UA_TYPE_START_ENCODEBINARY(UA_UInt16)
@@ -228,6 +231,7 @@ UA_TYPE_METHOD_DELETEMEMBERS_NOACTION(UA_UInt16)
 UA_TYPE_METHOD_INIT_DEFAULT(UA_UInt16)
 UA_TYPE_METHOD_NEW_DEFAULT(UA_UInt16)
 UA_TYPE_METHOD_COPY(UA_UInt16)
+UA_TYPE_METHOD_DECODEXML_NOTIMPL(UA_UInt16)
 
 /** UA_Int16 - signed integer, 2 bytes */
 UA_TYPE_METHOD_CALCSIZE_SIZEOF(UA_Int16)
@@ -281,6 +285,7 @@ UA_TYPE_METHOD_DELETEMEMBERS_NOACTION(UA_UInt32)
 UA_TYPE_METHOD_INIT_DEFAULT(UA_UInt32)
 UA_TYPE_METHOD_NEW_DEFAULT(UA_UInt32)
 UA_TYPE_METHOD_COPY(UA_UInt32)
+UA_TYPE_METHOD_DECODEXML_NOTIMPL(UA_UInt32)
 
 /** UA_Int64 - signed integer, 8 bytes */
 UA_TYPE_METHOD_CALCSIZE_SIZEOF(UA_Int64)
@@ -309,6 +314,8 @@ UA_TYPE_METHOD_DELETEMEMBERS_NOACTION(UA_Int64)
 UA_TYPE_METHOD_INIT_DEFAULT(UA_Int64)
 UA_TYPE_METHOD_NEW_DEFAULT(UA_Int64)
 UA_TYPE_METHOD_COPY(UA_Int64)
+UA_TYPE_METHOD_DECODEXML_NOTIMPL(UA_Int64)
+
 
 /** UA_UInt64 - unsigned integer, 8 bytes */
 UA_TYPE_METHOD_CALCSIZE_SIZEOF(UA_UInt64)
@@ -331,6 +338,7 @@ UA_TYPE_METHOD_DELETEMEMBERS_NOACTION(UA_UInt64)
 UA_TYPE_METHOD_INIT_DEFAULT(UA_UInt64)
 UA_TYPE_METHOD_NEW_DEFAULT(UA_UInt64)
 UA_TYPE_METHOD_COPY(UA_UInt64)
+UA_TYPE_METHOD_DECODEXML_NOTIMPL(UA_UInt64)
 
 /** UA_Float - IEE754 32bit float with biased exponent */
 UA_TYPE_METHOD_CALCSIZE_SIZEOF(UA_Float)
@@ -368,6 +376,7 @@ UA_Int32 UA_Float_init(UA_Float * p){
 }
 UA_TYPE_METHOD_NEW_DEFAULT(UA_Float)
 UA_TYPE_METHOD_COPY(UA_Float)
+UA_TYPE_METHOD_DECODEXML_NOTIMPL(UA_Float)
 
 /** UA_Float - IEEE754 64bit float with biased exponent*/
 UA_TYPE_METHOD_CALCSIZE_SIZEOF(UA_Double)
@@ -408,6 +417,7 @@ UA_TYPE_METHOD_DELETEMEMBERS_NOACTION(UA_Double)
 UA_TYPE_METHOD_INIT_DEFAULT(UA_Double)
 UA_TYPE_METHOD_NEW_DEFAULT(UA_Double)
 UA_TYPE_METHOD_COPY(UA_Double)
+UA_TYPE_METHOD_DECODEXML_NOTIMPL(UA_Double)
 
 /** UA_String */
 UA_Int32 UA_String_calcSize(UA_String const * string) {
@@ -653,6 +663,9 @@ UA_Int32 UA_Guid_copy(UA_Guid const *src, UA_Guid *dst)
 	retval |= UA_memcpy((void*)dst,(void*)src,UA_Guid_calcSize(UA_NULL));
 	return retval;
 }
+UA_TYPE_METHOD_DECODEXML_NOTIMPL(UA_Guid)
+
+
 UA_Int32 UA_LocalizedText_calcSize(UA_LocalizedText const * p) {
 	UA_Int32 length = 0;
 	if (p==UA_NULL) {
@@ -1089,6 +1102,7 @@ UA_Int32 UA_ExtensionObject_copy(UA_ExtensionObject const  *src, UA_ExtensionObj
 	retval |= UA_NodeId_copy(&(src->typeId),&(dst->typeId));
 	return retval;
 }
+UA_TYPE_METHOD_DECODEXML_NOTIMPL(UA_ExtensionObject)
 
 /** DiagnosticInfo - Part: 4, Chapter: 7.9, Page: 116 */
 UA_Int32 UA_DiagnosticInfo_calcSize(UA_DiagnosticInfo const * ptr) {
@@ -1239,7 +1253,10 @@ UA_Int32 UA_DiagnosticInfo_copy(UA_DiagnosticInfo const  *src, UA_DiagnosticInfo
 
 	return retval;
 }
-UA_TYPE_METHOD_PROTOTYPES_AS(UA_DateTime,UA_Int64)
+UA_TYPE_METHOD_DECODEXML_NOTIMPL(UA_DiagnosticInfo)
+
+UA_TYPE_METHOD_PROTOTYPES_AS_WOXML(UA_DateTime,UA_Int64)
+UA_TYPE_METHOD_DECODEXML_NOTIMPL(UA_DateTime)
 UA_TYPE_METHOD_NEW_DEFAULT(UA_DateTime)
 
 #include <sys/time.h>
@@ -1305,8 +1322,13 @@ UA_TYPE_METHOD_NEW_DEFAULT(UA_XmlElement)
 UA_TYPE_METHOD_PROTOTYPES_AS(UA_IntegerId, UA_Int32)
 UA_TYPE_METHOD_NEW_DEFAULT(UA_IntegerId)
 
-UA_TYPE_METHOD_PROTOTYPES_AS(UA_StatusCode, UA_UInt32)
+UA_TYPE_METHOD_PROTOTYPES_AS_WOXML(UA_StatusCode, UA_UInt32)
 UA_TYPE_METHOD_NEW_DEFAULT(UA_StatusCode)
+UA_Int32 UA_StatusCode_decodeXML(XML_Stack* s, XML_Attr* attr, UA_StatusCode* dst, _Bool isStart)
+{
+	DBG_VERBOSE(printf("UA_StatusCode_decodeXML entered with dst=%p,isStart=%d\n", (void* ) dst, isStart));
+	return UA_ERR_NOT_IMPLEMENTED;
+}
 
 /** QualifiedName - Part 4, Chapter
  * but see Part 6, Chapter 5.2.2.13 for Binary Encoding
@@ -1450,7 +1472,7 @@ UA_Int32 UA_Variant_decodeBinary(UA_ByteString const * src, UA_Int32 *pos, UA_Va
 	UA_Int32 ns0Id = dst->encodingMask & UA_VARIANT_ENCODINGMASKTYPE_TYPEID_MASK;
 
 	// initialize vTable
-	UA_Int32 uaIdx = UA_toIndex(ns0Id);
+	UA_Int32 uaIdx = UA_ns0ToVTableIndex(ns0Id);
 	if(UA_VTable_isValidType(uaIdx) != UA_SUCCESS)
 		return UA_ERROR;
 	dst->vt = &UA_[uaIdx];
@@ -1483,7 +1505,7 @@ UA_TYPE_METHOD_DELETE_STRUCT(UA_Variant)
 UA_Int32 UA_Variant_deleteMembers(UA_Variant  * p) {
 	UA_Int32 retval = UA_SUCCESS;
 	if(p->data != UA_NULL) {
-		retval |= UA_Array_delete(&p->data,p->arrayLength,UA_toIndex(p->vt->ns0Id));
+		retval |= UA_Array_delete(&p->data,p->arrayLength,UA_ns0ToVTableIndex(p->vt->ns0Id));
 		retval |= UA_Array_delete(&p->data,p->arrayDimensionsLength,UA_INT32_NS0);
 	}
 	return retval;
@@ -1504,7 +1526,7 @@ UA_Int32 UA_Variant_copy(UA_Variant const *src, UA_Variant *dst)
 {
 	UA_Int32 retval = UA_SUCCESS;
 	UA_Int32 ns0Id = src->encodingMask & UA_VARIANT_ENCODINGMASKTYPE_TYPEID_MASK;
-	UA_Int32 uaIdx = UA_toIndex(ns0Id);
+	UA_Int32 uaIdx = UA_ns0ToVTableIndex(ns0Id);
 	void * pData;
 	if(UA_VTable_isValidType(uaIdx) != UA_SUCCESS){
 		return UA_ERROR;
@@ -1524,7 +1546,7 @@ UA_Int32 UA_Variant_copy(UA_Variant const *src, UA_Variant *dst)
 	}
 
 	if (src->encodingMask & UA_VARIANT_ENCODINGMASKTYPE_DIMENSIONS) {
-		retval |=  UA_Array_copy((const void * const *)(src->arrayDimensions),src->arrayDimensionsLength, UA_toIndex(UA_INT32_NS0),(void***)&(dst->arrayDimensions));
+		retval |=  UA_Array_copy((const void * const *)(src->arrayDimensions),src->arrayDimensionsLength, UA_ns0ToVTableIndex(UA_INT32_NS0),(void***)&(dst->arrayDimensions));
 	}
 	return retval;
 }
@@ -1644,6 +1666,8 @@ UA_Int32 UA_DataValue_copy(UA_DataValue const *src, UA_DataValue *dst){
 
 	return retval;
 }
+UA_TYPE_METHOD_DECODEXML_NOTIMPL(UA_DataValue)
+
 /* UA_InvalidType - internal type necessary to handle inited Variants correctly */
 UA_Int32 UA_InvalidType_calcSize(UA_InvalidType const * p) {
 	return 0;
@@ -1673,3 +1697,4 @@ UA_Int32 UA_InvalidType_copy(UA_InvalidType const* src, UA_InvalidType *dst) {
 UA_Int32 UA_InvalidType_new(UA_InvalidType** p) {
 	return UA_ERR_INVALID_VALUE;
 }
+UA_TYPE_METHOD_DECODEXML_NOTIMPL(UA_InvalidType)

@@ -1463,8 +1463,6 @@ START_TEST(UA_DateTime_toStringShallWorkOnExample)
 	UA_DateTime_toString(src, &dst);
 	// then
 	ck_assert_int_eq(dst.length, 80);
-	char df = 'a';
-	UA_String_printf(&df, &dst);
 	ck_assert_int_eq(dst.data[0], ' ');
 	ck_assert_int_eq(dst.data[1], '4');
 	ck_assert_int_eq(dst.data[2], '/');
@@ -1623,6 +1621,100 @@ START_TEST(UA_DiagnosticInfo_copyShallWorkOnExample)
 	UA_free(copiedValue);
 	UA_free(value);
 
+}
+END_TEST
+START_TEST(UA_ApplicationDescription_copyShallWorkOnExample)
+{
+	//given
+	UA_ApplicationDescription *value = UA_NULL;
+	UA_ApplicationDescription *copiedValue = UA_NULL;
+
+	UA_Int32 retval = 0;
+	UA_String appString;
+	UA_String discString;
+	UA_String gateWayString;
+	UA_Int32 appSize = 3;
+	UA_Int32 discSize = 4;
+	UA_Int32 gateWaySize = 7;
+	UA_Int32 i,j;
+	appString.data = UA_NULL;
+	discString.data = UA_NULL;
+	gateWayString.data = UA_NULL;
+
+	UA_alloc((void**)&appString.data,appSize);
+	appString.data[0] = 'A';
+	appString.data[1] = 'P';
+	appString.data[2] = 'P';
+	appString.length = appSize;
+
+	UA_alloc((void**)&discString.data,discSize);
+	discString.data[0] = 'D';
+	discString.data[1] = 'I';
+	discString.data[2] = 'S';
+	discString.data[3] = 'C';
+	discString.length = discSize;
+
+	UA_alloc((void**)&gateWayString.data,gateWaySize);
+	gateWayString.data[0] = 'G';
+	gateWayString.data[1] = 'A';
+	gateWayString.data[2] = 'T';
+	gateWayString.data[3] = 'E';
+	gateWayString.data[4] = 'W';
+	gateWayString.data[5] = 'A';
+	gateWayString.data[6] = 'Y';
+	gateWayString.length = gateWaySize;
+
+	UA_String **srcArray; UA_Array_new((void***)&srcArray,3,UA_STRING);
+	UA_String_copycstring("__open",srcArray[0]);
+	UA_String_copycstring("_62541",srcArray[1]);
+	UA_String_copycstring("opc ua",srcArray[2]);
+
+	UA_ApplicationDescription_new(&value);
+	value->applicationUri.length = appString.length;
+	value->applicationUri.data = appString.data;
+	value->discoveryProfileUri.length = discString.length;
+	value->discoveryProfileUri.data = discString.data;
+	value->gatewayServerUri.length = gateWayString.length;
+	value->gatewayServerUri.data = gateWayString.data;
+	value->discoveryUrlsSize = 3;
+	value->discoveryUrls = srcArray;
+
+	UA_alloc((void**)&copiedValue,UA_ApplicationDescription_calcSize(UA_NULL));
+	//when
+	retval = UA_ApplicationDescription_copy(value, copiedValue);
+
+	//then
+	ck_assert_int_eq(retval, UA_SUCCESS);
+
+	for(i=0; i<appSize; i++){
+		ck_assert_int_eq(copiedValue->applicationUri.data[i],value->applicationUri.data[i]);
+	}
+	ck_assert_int_eq(copiedValue->applicationUri.length, value->applicationUri.length);
+
+	for(i=0; i<discSize; i++){
+		ck_assert_int_eq(copiedValue->discoveryProfileUri.data[i],value->discoveryProfileUri.data[i]);
+	}
+	ck_assert_int_eq(copiedValue->discoveryProfileUri.length, value->discoveryProfileUri.length);
+
+	for(i=0; i<gateWaySize; i++){
+		ck_assert_int_eq(copiedValue->gatewayServerUri.data[i],value->gatewayServerUri.data[i]);
+	}
+	ck_assert_int_eq(copiedValue->gatewayServerUri.length, value->gatewayServerUri.length);
+
+	//String Array Test
+	for(i=0;i<3;i++){
+		for(j=0;j<6;j++){
+			ck_assert_int_eq((value->discoveryUrls[i])->data[j],(copiedValue->discoveryUrls[i])->data[j]);
+		}
+		ck_assert_int_eq((value->discoveryUrls[i])->length,(copiedValue->discoveryUrls[i])->length);
+	}
+	ck_assert_int_eq((copiedValue->discoveryUrls[0])->data[2],'o');
+	ck_assert_int_eq((copiedValue->discoveryUrls[0])->data[3],'p');
+	ck_assert_int_eq(copiedValue->discoveryUrlsSize, value->discoveryUrlsSize);
+
+	//finally
+	UA_free(copiedValue);
+	UA_free(value);
 }
 END_TEST
 
@@ -1919,6 +2011,7 @@ Suite *testSuite_builtin(void)
 	tcase_add_test(tc_copy, UA_Variant_copyShallWorkOn2DArrayExample);
 
 	tcase_add_test(tc_copy, UA_DiagnosticInfo_copyShallWorkOnExample);
+	tcase_add_test(tc_copy, UA_ApplicationDescription_copyShallWorkOnExample);
 	suite_add_tcase(s,tc_copy);
 	return s;
 }

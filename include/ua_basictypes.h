@@ -36,8 +36,9 @@ typedef int64_t UA_Int64;
 typedef uint64_t UA_UInt64;
 typedef float UA_Float;
 typedef double UA_Double;
+
 /* ByteString - Part: 6, Chapter: 5.2.2.7, Page: 17 */
-typedef struct T_UA_ByteString
+typedef struct UA_ByteString
 {
 	UA_Int32 	length;
 	UA_Byte*	data;
@@ -91,10 +92,14 @@ UA_Int32 UA_Array_init(void **p,UA_Int32 noElements, UA_Int32 type);
 UA_Int32 UA_Array_new(void ***p,UA_Int32 noElements, UA_Int32 type);
 UA_Int32 UA_Array_copy(void const * const *src,UA_Int32 noElements, UA_Int32 type, void ***dst);
 
+struct XML_Stack; // forward declaration for protoytpes
+typedef char const * const XML_Attr;
+
 #define UA_TYPE_METHOD_PROTOTYPES(TYPE) \
 	UA_Int32 TYPE##_calcSize(TYPE const * ptr);							\
 	UA_Int32 TYPE##_encodeBinary(TYPE const * src, UA_Int32* pos, UA_ByteString * dst);	\
 	UA_Int32 TYPE##_decodeBinary(UA_ByteString const * src, UA_Int32* pos, TYPE * dst);	\
+	UA_Int32 TYPE##_decodeXML(struct XML_Stack* s, XML_Attr* attr, TYPE* dst, _Bool isStart); \
 	UA_Int32 TYPE##_delete(TYPE * p);									\
 	UA_Int32 TYPE##_deleteMembers(TYPE * p);							\
 	UA_Int32 TYPE##_init(TYPE * p);										\
@@ -140,6 +145,17 @@ UA_Int32 TYPE##_decodeBinary(UA_ByteString const * src, UA_Int32* pos, TYPE *dst
 	return TYPE_AS##_decodeBinary(src,pos,(TYPE_AS*) dst); \
 }
 
+#define UA_TYPE_METHOD_DECODEXML_NOTIMPL(TYPE) \
+UA_Int32 TYPE##_decodeXML(XML_Stack* s, XML_Attr* attr, TYPE* dst, _Bool isStart) { \
+	DBG_VERBOSE(printf(#TYPE "_decodeXML entered with dst=%p,isStart=%d\n", (void* ) dst, isStart)); \
+	return UA_ERR_NOT_IMPLEMENTED;\
+}
+
+#define UA_TYPE_METHOD_DECODEXML_AS(TYPE,TYPE_AS) \
+UA_Int32 TYPE##_decodeXML(struct XML_Stack* s, XML_Attr* attr, TYPE* dst, _Bool isStart) { \
+	return TYPE_AS##_decodeXML(s,attr,(TYPE_AS*) dst,isStart); \
+}
+
 #define UA_TYPE_METHOD_ENCODEBINARY_AS(TYPE,TYPE_AS) \
 UA_Int32 TYPE##_encodeBinary(TYPE const * src, UA_Int32* pos, UA_ByteString *dst) { \
 	return TYPE_AS##_encodeBinary((TYPE_AS*) src,pos,dst); \
@@ -154,7 +170,7 @@ UA_Int32 TYPE##_copy(TYPE const *src, TYPE *dst) {return TYPE_AS##_copy((TYPE_AS
 }
 
 
-#define UA_TYPE_METHOD_PROTOTYPES_AS(TYPE, TYPE_AS) \
+#define UA_TYPE_METHOD_PROTOTYPES_AS_WOXML(TYPE, TYPE_AS) \
 UA_TYPE_METHOD_CALCSIZE_AS(TYPE, TYPE_AS) \
 UA_TYPE_METHOD_ENCODEBINARY_AS(TYPE, TYPE_AS) \
 UA_TYPE_METHOD_DECODEBINARY_AS(TYPE, TYPE_AS) \
@@ -163,6 +179,9 @@ UA_TYPE_METHOD_DELETEMEMBERS_AS(TYPE, TYPE_AS) \
 UA_TYPE_METHOD_INIT_AS(TYPE, TYPE_AS) \
 UA_TYPE_METHOD_COPY_AS(TYPE, TYPE_AS)
 
+#define UA_TYPE_METHOD_PROTOTYPES_AS(TYPE, TYPE_AS) \
+UA_TYPE_METHOD_PROTOTYPES_AS_WOXML(TYPE, TYPE_AS) \
+UA_TYPE_METHOD_DECODEXML_AS(TYPE, TYPE_AS)
 
 #define UA_TYPE_METHOD_NEW_DEFAULT(TYPE) \
 UA_Int32 TYPE##_new(TYPE ** p){ \
@@ -210,38 +229,11 @@ UA_TYPE_METHOD_PROTOTYPES (UA_StatusCode)
 typedef float UA_IntegerId;
 UA_TYPE_METHOD_PROTOTYPES (UA_IntegerId)
 
-typedef struct T_UA_VTable {
-	UA_UInt32 ns0Id;
-	UA_Int32 (*calcSize)(void const * ptr);
-	UA_Int32 (*decodeBinary)(UA_ByteString const * src, UA_Int32* pos, void* dst);
-	UA_Int32 (*encodeBinary)(void const * src, UA_Int32* pos, UA_ByteString* dst);
-	UA_Int32 (*init)(void * p);
-	UA_Int32 (*new)(void ** p);
-	UA_Int32 (*copy)(void const *src,void *dst);
-	UA_Int32 (*delete)(void * p);
-	UA_Byte* name;
-} UA_VTable;
-
-/* VariantBinaryEncoding - Part: 6, Chapter: 5.2.2.16, Page: 22 */
-enum UA_VARIANT_ENCODINGMASKTYPE_enum
-{
-	UA_VARIANT_ENCODINGMASKTYPE_TYPEID_MASK = 0x3F,	// bits 0:5
-	UA_VARIANT_ENCODINGMASKTYPE_DIMENSIONS = (0x01 << 6), // bit 6
-	UA_VARIANT_ENCODINGMASKTYPE_ARRAY = ( 0x01 << 7) // bit 7
-};
-
-typedef struct T_UA_Variant {
-	UA_VTable* vt;		// internal entry into vTable
-	UA_Byte encodingMask; 	// Type of UA_Variant_EncodingMaskType_enum
-	UA_Int32 arrayLength;	// total number of elements
-	UA_Int32 arrayDimensionsLength;
-	UA_Int32 **arrayDimensions;
-	void** data;
-} UA_Variant;
-UA_TYPE_METHOD_PROTOTYPES (UA_Variant)
-
-/* String - Part: 6, Chapter: 5.2.2.4, Page: 16 */
-typedef struct T_UA_String
+/** @brief String Object
+ *
+ *  String - Part: 6, Chapter: 5.2.2.4, Page: 16
+ */
+typedef struct UA_String
 {
 	UA_Int32 	length;
 	UA_Byte*	data;
@@ -263,13 +255,93 @@ UA_Int32 UA_ByteString_compare(const UA_ByteString *string1, const UA_ByteString
 UA_Int32 UA_ByteString_newMembers(UA_ByteString* p, UA_Int32 length);
 extern UA_ByteString UA_ByteString_securityPoliceNone;
 
+
+/** UA_NodeSetAlias - a readable shortcut for NodeIds. A list of aliases
+ * is intensively used in the namespace0-xml-files
+ * */
+typedef struct UA_NodeSetAlias {
+	UA_String alias;
+	UA_String value;
+} UA_NodeSetAlias;
+UA_TYPE_METHOD_PROTOTYPES (UA_NodeSetAlias)
+
+/** UA_NodeSetAliases - a list of aliases
+ * */
+typedef struct UA_NodeSetAliases {
+	UA_Int32 size;
+	UA_NodeSetAlias** aliases;
+} UA_NodeSetAliases;
+UA_TYPE_METHOD_PROTOTYPES (UA_NodeSetAliases)
+
+
+typedef char const * cstring;
+
+#define XML_STACK_MAX_DEPTH 10
+#define XML_STACK_MAX_CHILDREN 40
+typedef UA_Int32 (*XML_decoder)(struct XML_Stack* s, XML_Attr* attr, void* dst, _Bool isStart);
+
+typedef struct XML_child {
+	cstring name;
+	UA_Int32 type;
+	XML_decoder elementHandler;
+	void* obj;
+} XML_child;
+
+typedef struct XML_Parent {
+	cstring name;
+	int textAttribIdx; // -1 - not set
+	cstring textAttrib;
+	int activeChild; // -1 - no active child
+	int len; // -1 - empty set
+	XML_child children[XML_STACK_MAX_CHILDREN];
+} XML_Parent;
+
+
+typedef struct XML_Stack {
+	int depth;
+	XML_Parent parent[XML_STACK_MAX_DEPTH];
+	UA_NodeSetAliases* aliases; // shall point to the aliases of the NodeSet after reading
+} XML_Stack;
+
+typedef struct UA_VTable {
+	UA_Byte* name;
+	UA_UInt32 ns0Id;
+	UA_Int32 (*calcSize)(void const * ptr);
+	UA_Int32 (*decodeBinary)(UA_ByteString const * src, UA_Int32* pos, void* dst);
+	UA_Int32 (*encodeBinary)(void const * src, UA_Int32* pos, UA_ByteString* dst);
+	UA_Int32 (*decodeXML)(XML_Stack* s, XML_Attr* attr, void* dst, _Bool isStart);
+	UA_Int32 (*init)(void * p);
+	UA_Int32 (*new)(void ** p);
+	UA_Int32 (*copy)(void const *src,void *dst);
+	UA_Int32 (*delete)(void * p);
+} UA_VTable;
+
+/* VariantBinaryEncoding - Part: 6, Chapter: 5.2.2.16, Page: 22 */
+enum UA_VARIANT_ENCODINGMASKTYPE_enum
+{
+	UA_VARIANT_ENCODINGMASKTYPE_TYPEID_MASK = 0x3F,	// bits 0:5
+	UA_VARIANT_ENCODINGMASKTYPE_DIMENSIONS = (0x01 << 6), // bit 6
+	UA_VARIANT_ENCODINGMASKTYPE_ARRAY = ( 0x01 << 7) // bit 7
+};
+
+typedef struct UA_Variant {
+	UA_VTable* vt;		// internal entry into vTable
+	UA_Byte encodingMask; 	// Type of UA_Variant_EncodingMaskType_enum
+	UA_Int32 arrayLength;	// total number of elements
+	UA_Int32 arrayDimensionsLength;
+	UA_Int32 **arrayDimensions;
+	void** data;
+} UA_Variant;
+UA_TYPE_METHOD_PROTOTYPES (UA_Variant)
+
+
 /** LocalizedTextBinaryEncoding - Part: 6, Chapter: 5.2.2.14, Page: 21 */
 enum UA_LOCALIZEDTEXT_ENCODINGMASKTYPE_enum
 {
 	UA_LOCALIZEDTEXT_ENCODINGMASKTYPE_LOCALE = 0x01,
 	UA_LOCALIZEDTEXT_ENCODINGMASKTYPE_TEXT = 0x02
 };
-typedef struct T_UA_LocalizedText
+typedef struct UA_LocalizedText
 {
 	UA_Byte encodingMask;
 	UA_String locale;
@@ -284,7 +356,7 @@ void UA_ByteString_printx(char* label, const UA_ByteString* string);
 void UA_ByteString_printx_hex(char* label, const UA_ByteString* string);
 
 /* GuidType - Part: 6, Chapter: 5.2.2.6 Page: 17 */
-typedef struct T_UA_Guid
+typedef struct UA_Guid
 {
 	UA_UInt32 data1;
 	UA_UInt16 data2;
@@ -299,7 +371,7 @@ typedef UA_Int64 UA_DateTime; //100 nanosecond resolution
 UA_TYPE_METHOD_PROTOTYPES (UA_DateTime)
 
 UA_DateTime UA_DateTime_now();
-typedef struct T_UA_DateTimeStruct
+typedef struct UA_DateTimeStruct
 {
 	UA_Int16 nanoSec;
 	UA_Int16 microSec;
@@ -315,7 +387,7 @@ UA_DateTimeStruct UA_DateTime_toStruct(UA_DateTime time);
 UA_Int32 UA_DateTime_toString(UA_DateTime time, UA_String* timeString);
 
 
-typedef struct T_UA_NodeId
+typedef struct UA_NodeId
 {
 	UA_Byte   encodingByte; //enum BID_NodeIdEncodingValuesType
 	UA_UInt16 namespace;
@@ -335,7 +407,7 @@ UA_Int32 UA_NodeId_compare(const UA_NodeId *n1, const UA_NodeId *n2);
 void UA_NodeId_printf(char* label, const UA_NodeId* node);
 
 /** XmlElement - Part: 6, Chapter: 5.2.2.8, Page: 17 */
-typedef struct T_UA_XmlElement
+typedef struct UA_XmlElement
 {
 	//TODO Überlegung ob man es direkt als ByteString speichert oder als String
 	UA_ByteString data;
@@ -348,7 +420,7 @@ UA_TYPE_METHOD_PROTOTYPES (UA_XmlElement)
 #define UA_NODEIDTYPE_NAMESPACE_URI_FLAG 0x80
 #define UA_NODEIDTYPE_SERVERINDEX_FLAG   0x40
 #define UA_NODEIDTYPE_MASK (~(UA_NODEIDTYPE_NAMESPACE_URI_FLAG | UA_NODEIDTYPE_SERVERINDEX_FLAG))
-typedef struct T_UA_ExpandedNodeId
+typedef struct UA_ExpandedNodeId
 {
 	UA_NodeId nodeId;
 	UA_String namespaceUri;
@@ -363,7 +435,7 @@ UA_TYPE_METHOD_PROTOTYPES(UA_IdentifierType)
 
 
 /* ExtensionObjectBinaryEncoding - Part: 6, Chapter: 5.2.2.15, Page: 21 */
-typedef struct T_UA_ExtensionObject {
+typedef struct UA_ExtensionObject {
 	UA_NodeId typeId;
 	UA_Byte encoding; //Type of the enum UA_ExtensionObjectEncodingMaskType
 	UA_ByteString body;
@@ -378,7 +450,7 @@ enum UA_ExtensionObject_EncodingMaskType_enum
 };
 
 /* QualifiedNameBinaryEncoding - Part: 6, Chapter: 5.2.2.13, Page: 20 */
-typedef struct T_UA_QualifiedName {
+typedef struct UA_QualifiedName {
 	UA_UInt16 namespaceIndex;
 	UA_UInt16 reserved;
 	UA_String name;
@@ -409,7 +481,7 @@ enum UA_DATAVALUE_ENCODINGMASKTYPE_enum
 };
 
 /* DiagnosticInfo - Part: 6, Chapter: 5.2.2.12, Page: 20 */
-typedef struct T_UA_DiagnosticInfo {
+typedef struct UA_DiagnosticInfo {
 	UA_Byte encodingMask; //Type of the Enum UA_DIAGNOSTICINFO_ENCODINGMASKTYPE
 	UA_Int32 symbolicId;
 	UA_Int32 namespaceUri;
@@ -417,7 +489,7 @@ typedef struct T_UA_DiagnosticInfo {
 	UA_Int32 locale;
 	UA_String additionalInfo;
 	UA_StatusCode innerStatusCode;
-	struct T_UA_DiagnosticInfo* innerDiagnosticInfo;
+	struct UA_DiagnosticInfo* innerDiagnosticInfo;
 } UA_DiagnosticInfo;
 UA_TYPE_METHOD_PROTOTYPES(UA_DiagnosticInfo)
 
