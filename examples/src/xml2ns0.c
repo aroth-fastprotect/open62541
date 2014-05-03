@@ -27,8 +27,10 @@ int main() {
 		}
 	}
 	XML_ParserFree(parser);
+
+	printf("aliases addr=%p, size=%d\n", (void*) &(n.aliases), n.aliases.size);
+	UA_NodeSetAliases_println("aliases in nodeset: ", &n.aliases);
+
 	Namespace_iterate(n.ns, print_node);
-	// printf("aliases addr=%p, size=%d\n", (void*) &(n.aliases), n.aliases.size);
-	// UA_NodeSetAliases_println("aliases in nodeset: ", &n.aliases);
 	return 0;
 }
