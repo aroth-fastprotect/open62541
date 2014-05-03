@@ -366,7 +366,8 @@ print('''/**********************************************************
  * Generated from '''+sys.argv[1]+''' with script '''+sys.argv[0]+'''
  * on host '''+platform.uname()[1]+''' by user '''+getpass.getuser()+''' at '''+ time.strftime("%Y-%m-%d %I:%M:%S")+'''
  **********************************************************/
- 
+
+#include <stdio.h> 
 #include "''' + sys.argv[2] + '.h"', end='\n', file=fc);
 
 # types for which we create a vector type

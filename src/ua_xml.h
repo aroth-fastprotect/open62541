@@ -33,7 +33,7 @@ typedef struct UA_TypedArray {
 UA_Int32 UA_TypedArray_init(UA_TypedArray* p);
 UA_Int32 UA_TypedArray_new(UA_TypedArray** p);
 UA_Int32 UA_TypedArray_setType(UA_TypedArray* p, UA_Int32 type);
-UA_Int32 UA_TypedArray_decodeXML(XML_Stack* s, XML_Attr* attr, UA_Int32 type, UA_TypedArray* dst, _Bool isStart);
+UA_Int32 UA_TypedArray_decodeXML(XML_Stack* s, XML_Attr* attr, UA_TypedArray* dst, _Bool isStart);
 
 UA_Int32 UA_NodeSetAlias_init(UA_NodeSetAlias* p);
 UA_Int32 UA_NodeSetAlias_new(UA_NodeSetAlias** p);

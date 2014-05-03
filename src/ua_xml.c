@@ -509,16 +509,23 @@ UA_Int32 UA_NodeSetReferences_decodeXML(XML_Stack* s, XML_Attr* attr, UA_NodeSet
 	return UA_SUCCESS;
 }
 
-UA_Int32 UA_TypedArray_decodeXML(XML_Stack* s, XML_Attr* attr, UA_Int32 type, UA_TypedArray* dst, _Bool isStart) {
-	DBG_VERBOSE(printf("UA_TypedArray_decodeXML - entered with dst=%p,type=%d,isStart=%d\n", (void* ) dst, type, isStart));
+UA_Int32 UA_TypedArray_decodeXML(XML_Stack* s, XML_Attr* attr, UA_TypedArray* dst, _Bool isStart) {
+	UA_Int32 type = s->parent[s->depth - 1].children[s->parent[s->depth - 1].activeChild].type;
+	cstring names  = s->parent[s->depth - 1].children[s->parent[s->depth - 1].activeChild].name;
+	DBG_VERBOSE(printf("UA_TypedArray_decodeXML - entered with dst=%p,isStart=%d,type={%d,%s},name=%s\n", (void* ) dst, isStart,type,UA_[type].name, names));
 	if (isStart) {
 		if (dst == UA_NULL) {
 			UA_TypedArray_new(&dst);
 			UA_TypedArray_setType(dst, type);
 			s->parent[s->depth - 1].children[s->parent[s->depth - 1].activeChild].obj = dst;
 		}
-		s->parent[s->depth].len = 0;
-		XML_Stack_addChildHandler(s, (cstring) UA_[type].name, (XML_decoder) UA_[type].decodeXML, type, UA_NULL);
+		// FIXME: when to free name?
+		char* name;
+		UA_alloc(&name,strlen(names));
+		strncpy(name,names,strlen(names));
+		name[strlen(names)-1]=0;
+		DBG_VERBOSE(printf("UA_TypedArray_decodeXML - add handler for %s\n", names));
+		XML_Stack_addChildHandler(s, name, (XML_decoder) UA_[type].decodeXML, type, UA_NULL);
 	} else {
 		// sub element is ready, add to array
 		if (dst->size < 0 || dst->size == 0) {
@@ -553,16 +560,11 @@ UA_Int32 UA_DataTypeNode_decodeXML(XML_Stack* s, XML_Attr* attr, UA_DataTypeNode
 		}
 
 		s->parent[s->depth].len = 0;
-		XML_Stack_addChildHandler(s, "DisplayName", (XML_decoder) UA_LocalizedText_decodeXML, UA_LOCALIZEDTEXT,
-				&(dst->displayName));
-		XML_Stack_addChildHandler(s, "Description", (XML_decoder) UA_LocalizedText_decodeXML, UA_LOCALIZEDTEXT,
-				&(dst->description));
-		XML_Stack_addChildHandler(s, "BrowseName", (XML_decoder) UA_QualifiedName_decodeXML, UA_QUALIFIEDNAME,
-				&(dst->description));
-		XML_Stack_addChildHandler(s, "IsAbstract", (XML_decoder) UA_Boolean_decodeXML, UA_BOOLEAN,
-				&(dst->description));
-		XML_Stack_addChildHandler(s, "References", (XML_decoder) UA_NodeSetReferences_decodeXML, UA_INVALIDTYPE,
-		UA_NULL);
+		XML_Stack_addChildHandler(s, "DisplayName", (XML_decoder) UA_LocalizedText_decodeXML, UA_LOCALIZEDTEXT, &(dst->displayName));
+		XML_Stack_addChildHandler(s, "Description", (XML_decoder) UA_LocalizedText_decodeXML, UA_LOCALIZEDTEXT, &(dst->description));
+		XML_Stack_addChildHandler(s, "BrowseName", (XML_decoder) UA_QualifiedName_decodeXML, UA_QUALIFIEDNAME, &(dst->description));
+		XML_Stack_addChildHandler(s, "IsAbstract", (XML_decoder) UA_Boolean_decodeXML, UA_BOOLEAN, &(dst->description));
+		XML_Stack_addChildHandler(s, "References", (XML_decoder) UA_TypedArray_decodeXML, UA_REFERENCENODE, UA_NULL);
 
 		// set missing default attributes
 		dst->nodeClass = UA_NODECLASS_DATATYPE;
@@ -590,14 +592,13 @@ UA_Int32 UA_DataTypeNode_decodeXML(XML_Stack* s, XML_Attr* attr, UA_DataTypeNode
 	} else {
 		switch (s->parent[s->depth - 1].activeChild) {
 		case 4: // References
-		if (attr != UA_NULL) {
-			UA_NodeSetReferences* references = (UA_NodeSetReferences*) attr;
-			DBG_VERBOSE(
-					printf("finished aliases: references=%p, size=%d\n",(void*)references,(references==UA_NULL)?-1:references->size));
-			dst->referencesSize = references->size;
-			dst->references = references->references;
-		}
-			break;
+			if (attr != UA_NULL) {
+				UA_TypedArray* array = (UA_TypedArray *) attr;
+				DBG_VERBOSE(printf("finished aliases: references=%p, size=%d\n",(void*)array,(array==UA_NULL)?-1:array->size));
+				dst->referencesSize = array->size;
+				dst->references = (UA_ReferenceNode**) array->elements;
+			}
+		break;
 		default:
 			break;
 		}
@@ -978,8 +979,7 @@ void XML_Stack_startElement(void * data, const char *el, const char **attr) {
 			s->parent[s->depth].activeChild = -1;
 
 			// finally call the elementHandler and return
-			cp->children[i].elementHandler(data, attr, cp->children[i].obj,
-			TRUE);
+			cp->children[i].elementHandler(data, attr, cp->children[i].obj, TRUE);
 			return;
 		}
 	}
