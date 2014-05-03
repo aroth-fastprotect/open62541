@@ -68,7 +68,7 @@ UA_Int32 UA_ExpandedNodeId_copycstring(cstring src, UA_ExpandedNodeId* dst, UA_N
 void XML_Stack_init(XML_Stack* p, cstring name);
 void XML_Stack_print(XML_Stack* s);
 void XML_Stack_handleTextAsElementOf(XML_Stack* p, cstring textAttrib, unsigned int textAttribIdx);
-void XML_Stack_addChildHandler(XML_Stack* p, cstring name, XML_decoder handler, UA_Int32 type, void* dst);
+void XML_Stack_addChildHandler(XML_Stack* p, cstring name, UA_Int32 length, XML_decoder handler, UA_Int32 type, void* dst);
 
 void XML_Stack_startElement(void * data, const char *el, const char **attr);
 UA_Int32 XML_isSpace(cstring s, int len);

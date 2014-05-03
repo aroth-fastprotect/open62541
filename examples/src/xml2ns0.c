@@ -15,7 +15,7 @@ int main() {
 	XML_Stack_init(&s, "ROOT");
 	UA_NodeSet n;
 	UA_NodeSet_init(&n);
-	XML_Stack_addChildHandler(&s, "UANodeSet", (XML_decoder) UA_NodeSet_decodeXML, UA_INVALIDTYPE, &n);
+	XML_Stack_addChildHandler(&s, "UANodeSet", strlen("UANodeSet"), (XML_decoder) UA_NodeSet_decodeXML, UA_INVALIDTYPE, &n);
 
 	XML_Parser parser = XML_ParserCreate(NULL);
 	XML_SetUserData(parser, &s);

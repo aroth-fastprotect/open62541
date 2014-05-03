@@ -282,6 +282,7 @@ typedef UA_Int32 (*XML_decoder)(struct XML_Stack* s, XML_Attr* attr, void* dst, 
 
 typedef struct XML_child {
 	cstring name;
+	UA_Int32 length;
 	UA_Int32 type;
 	XML_decoder elementHandler;
 	void* obj;

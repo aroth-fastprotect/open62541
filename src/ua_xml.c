@@ -97,16 +97,16 @@ UA_Int32 UA_NodeId_copycstring(cstring src, UA_NodeId* dst, UA_NodeSetAliases* a
 }
 
 
-UA_Int32 UA_NodeSetReferences_init(UA_NodeSetReferences* p) {
-	p->size = -1;
-	p->references = UA_NULL;
-	return UA_SUCCESS;
-}
-UA_Int32 UA_NodeSetReferences_new(UA_NodeSetReferences** p) {
-	UA_alloc((void** )p, sizeof(UA_NodeSetReferences));
-	UA_NodeSetReferences_init(*p);
-	return UA_SUCCESS;
-}
+//UA_Int32 UA_NodeSetReferences_init(UA_NodeSetReferences* p) {
+//	p->size = -1;
+//	p->references = UA_NULL;
+//	return UA_SUCCESS;
+//}
+//UA_Int32 UA_NodeSetReferences_new(UA_NodeSetReferences** p) {
+//	UA_alloc((void** )p, sizeof(UA_NodeSetReferences));
+//	UA_NodeSetReferences_init(*p);
+//	return UA_SUCCESS;
+//}
 UA_Int32 UA_ReferenceNode_println(cstring label, UA_ReferenceNode *a) {
 	printf("%s{referenceType=%d, target=%d, isInverse=%d}\n",
 			label,
@@ -151,6 +151,7 @@ void XML_Stack_init(XML_Stack* p, cstring name) {
 		p->parent[i].textAttribIdx = -1;
 		for (j = 0; j < XML_STACK_MAX_CHILDREN; j++) {
 			p->parent[i].children[j].name = UA_NULL;
+			p->parent[i].children[j].length = -1;
 			p->parent[i].children[j].elementHandler = UA_NULL;
 			p->parent[i].children[j].type = UA_INVALIDTYPE;
 			p->parent[i].children[j].obj = UA_NULL;
@@ -172,9 +173,10 @@ void XML_Stack_handleTextAsElementOf(XML_Stack* p, cstring textAttrib, unsigned 
 	p->parent[p->depth].textAttribIdx = textAttribIdx;
 }
 
-void XML_Stack_addChildHandler(XML_Stack* p, cstring name, XML_decoder handler, UA_Int32 type, void* dst) {
+void XML_Stack_addChildHandler(XML_Stack* p, cstring name, UA_Int32 length, XML_decoder handler, UA_Int32 type, void* dst) {
 	unsigned int len = p->parent[p->depth].len;
 	p->parent[p->depth].children[len].name = name;
+	p->parent[p->depth].children[len].length = length;
 	p->parent[p->depth].children[len].elementHandler = handler;
 	p->parent[p->depth].children[len].type = type;
 	p->parent[p->depth].children[len].obj = dst;
@@ -253,7 +255,7 @@ UA_Int32 UA_String_decodeXML(XML_Stack* s, XML_Attr* attr, UA_String* dst, _Bool
 			s->parent[s->depth - 1].children[s->parent[s->depth - 1].activeChild].obj = (void*) dst;
 		}
 		s->parent[s->depth].len = 0;
-		XML_Stack_addChildHandler(s, "Length", (XML_decoder) UA_Int32_decodeXML, UA_INT32, &(dst->length));
+		XML_Stack_addChildHandler(s, "Length", strlen("Length"), (XML_decoder) UA_Int32_decodeXML, UA_INT32, &(dst->length));
 		XML_Stack_handleTextAsElementOf(s, "Data", 0);
 
 		// set attributes
@@ -283,9 +285,9 @@ UA_Int32 UA_NodeId_decodeXML(XML_Stack* s, XML_Attr* attr, UA_NodeId* dst, _Bool
 			s->parent[s->depth - 1].children[s->parent[s->depth - 1].activeChild].obj = (void*) dst;
 		}
 		s->parent[s->depth].len = 0;
-		XML_Stack_addChildHandler(s, "Namespace", (XML_decoder) UA_Int16_decodeXML, UA_INT16, &(dst->namespace));
-		XML_Stack_addChildHandler(s, "Numeric", (XML_decoder) UA_Int32_decodeXML, UA_INT32, &(dst->identifier.numeric));
-		XML_Stack_addChildHandler(s, "Id", (XML_decoder) UA_String_decodeXML, UA_STRING, UA_NULL);
+		XML_Stack_addChildHandler(s, "Namespace", strlen("Namespace"), (XML_decoder) UA_Int16_decodeXML, UA_INT16, &(dst->namespace));
+		XML_Stack_addChildHandler(s, "Numeric", strlen("Numeric"), (XML_decoder) UA_Int32_decodeXML, UA_INT32, &(dst->identifier.numeric));
+		XML_Stack_addChildHandler(s, "Id", strlen("Id"), (XML_decoder) UA_String_decodeXML, UA_STRING, UA_NULL);
 		XML_Stack_handleTextAsElementOf(s, "Data", 2);
 
 		// set attributes
@@ -324,11 +326,11 @@ UA_Int32 UA_ExpandedNodeId_decodeXML(XML_Stack* s, XML_Attr* attr, UA_ExpandedNo
 			s->parent[s->depth - 1].children[s->parent[s->depth - 1].activeChild].obj = (void*) dst;
 		}
 		s->parent[s->depth].len = 0;
-		XML_Stack_addChildHandler(s, "NodeId", (XML_decoder) UA_NodeId_decodeXML, UA_NODEID, &(dst->nodeId));
-		XML_Stack_addChildHandler(s, "Namespace", (XML_decoder) UA_Int16_decodeXML, UA_INT16, &(dst->nodeId.namespace));
-		XML_Stack_addChildHandler(s, "Numeric", (XML_decoder) UA_Int32_decodeXML, UA_INT32,
+		XML_Stack_addChildHandler(s, "NodeId", strlen("NodeId"), (XML_decoder) UA_NodeId_decodeXML, UA_NODEID, &(dst->nodeId));
+		XML_Stack_addChildHandler(s, "Namespace", strlen("Namespace"),(XML_decoder) UA_Int16_decodeXML, UA_INT16, &(dst->nodeId.namespace));
+		XML_Stack_addChildHandler(s, "Numeric", strlen("Numeric"),(XML_decoder) UA_Int32_decodeXML, UA_INT32,
 				&(dst->nodeId.identifier.numeric));
-		XML_Stack_addChildHandler(s, "Id", (XML_decoder) UA_String_decodeXML, UA_STRING, UA_NULL);
+		XML_Stack_addChildHandler(s, "Id", strlen("Id"),(XML_decoder) UA_String_decodeXML, UA_STRING, UA_NULL);
 		XML_Stack_handleTextAsElementOf(s, "Data", 3);
 
 		// set attributes
@@ -362,8 +364,8 @@ UA_Int32 UA_LocalizedText_decodeXML(XML_Stack* s, XML_Attr* attr, UA_LocalizedTe
 			s->parent[s->depth - 1].children[s->parent[s->depth - 1].activeChild].obj = (void*) dst;
 		}
 		s->parent[s->depth].len = 0;
-		XML_Stack_addChildHandler(s, "Text", (XML_decoder) UA_String_decodeXML, UA_STRING, &(dst->text));
-		XML_Stack_addChildHandler(s, "Locale", (XML_decoder) UA_String_decodeXML, UA_STRING, &(dst->locale));
+		XML_Stack_addChildHandler(s, "Text", strlen("Text"), (XML_decoder) UA_String_decodeXML, UA_STRING, &(dst->text));
+		XML_Stack_addChildHandler(s, "Locale", strlen("Locale"), (XML_decoder) UA_String_decodeXML, UA_STRING, &(dst->locale));
 		XML_Stack_handleTextAsElementOf(s, "Data", 0);
 
 		// set attributes
@@ -407,8 +409,8 @@ UA_Int32 UA_QualifiedName_decodeXML(XML_Stack* s, XML_Attr* attr, UA_QualifiedNa
 			s->parent[s->depth - 1].children[s->parent[s->depth - 1].activeChild].obj = (void*) dst;
 		}
 		s->parent[s->depth].len = 0;
-		XML_Stack_addChildHandler(s, "Name", (XML_decoder) UA_String_decodeXML, UA_STRING, &(dst->name));
-		XML_Stack_addChildHandler(s, "NamespaceIndex", (XML_decoder) UA_Int16_decodeXML, UA_STRING,
+		XML_Stack_addChildHandler(s, "Name", strlen("Name"), (XML_decoder) UA_String_decodeXML, UA_STRING, &(dst->name));
+		XML_Stack_addChildHandler(s, "NamespaceIndex", strlen("NamespaceIndex"), (XML_decoder) UA_Int16_decodeXML, UA_STRING,
 				&(dst->namespaceIndex));
 		XML_Stack_handleTextAsElementOf(s, "Data", 0);
 
@@ -442,10 +444,10 @@ UA_Int32 UA_ReferenceNode_decodeXML(XML_Stack* s, XML_Attr* attr, UA_ReferenceNo
 		}
 		// set handlers
 		s->parent[s->depth].len = 0;
-		XML_Stack_addChildHandler(s, "ReferenceType", (XML_decoder) UA_NodeId_decodeXML, UA_STRING,
+		XML_Stack_addChildHandler(s, "ReferenceType", strlen("ReferenceType"),(XML_decoder) UA_NodeId_decodeXML, UA_STRING,
 				&(dst->referenceTypeId));
-		XML_Stack_addChildHandler(s, "IsForward", (XML_decoder) UA_Boolean_decodeXML, UA_STRING, &(dst->isInverse));
-		XML_Stack_addChildHandler(s, "Target", (XML_decoder) UA_ExpandedNodeId_decodeXML, UA_STRING, &(dst->targetId));
+		XML_Stack_addChildHandler(s, "IsForward", strlen("IsForward"), (XML_decoder) UA_Boolean_decodeXML, UA_STRING, &(dst->isInverse));
+		XML_Stack_addChildHandler(s, "Target", strlen("Target"), (XML_decoder) UA_ExpandedNodeId_decodeXML, UA_STRING, &(dst->targetId));
 		XML_Stack_handleTextAsElementOf(s, "NodeId", 2);
 
 		// set attributes
@@ -472,42 +474,42 @@ UA_Int32 UA_ReferenceNode_decodeXML(XML_Stack* s, XML_Attr* attr, UA_ReferenceNo
 	return UA_SUCCESS;
 }
 
-UA_Int32 UA_NodeSetReferences_decodeXML(XML_Stack* s, XML_Attr* attr, UA_NodeSetReferences* dst, _Bool isStart) {
-	DBG_VERBOSE(printf("UA_NodeSetReferences entered with dst=%p,isStart=%d\n", (void* ) dst, isStart));
-	if (isStart) {
-		if (dst == UA_NULL) {
-			UA_NodeSetReferences_new(&dst);
-			s->parent[s->depth - 1].children[s->parent[s->depth - 1].activeChild].obj = (void*) dst;
-		}
-		s->parent[s->depth].len = 0;
-		XML_Stack_addChildHandler(s, "Reference", (XML_decoder) UA_ReferenceNode_decodeXML, UA_REFERENCENODE, UA_NULL);
-	} else {
-		// sub element is ready, add to array
-		if (dst->size < 0 || dst->size == 0) {
-			dst->size = 1;
-			UA_alloc((void** )&(dst->references), dst->size * sizeof(UA_ReferenceNode*));
-			DBG_VERBOSE(
-					printf("allocate references:dst=%p, aliases=%p, size=%d\n", (void* )dst, (void* )(dst->references),
-							dst->size));
-		} else {
-			dst->size++;
-			dst->references = realloc(dst->references, dst->size * sizeof(UA_NodeSetAlias*));
-			DBG_VERBOSE(
-					printf("reallocate references:dst=%p, aliases=%p, size=%d\n", (void* )dst,
-							(void* )(dst->references), dst->size));
-		}
-		// index starts with 0, therefore size-1
-		DBG_VERBOSE(printf("assign alias:dst=%p, src=%p\n", (void* )dst->references[dst->size - 1], (void* )attr));
-		dst->references[dst->size - 1] = (UA_ReferenceNode*) attr;
-		// TODO: It is a design flaw that we need to do this here, isn't it?
-		DBG_VERBOSE(
-				printf("UA_NodeSetReferences clears %p\n",
-						(void* ) (s->parent[s->depth - 1].children[s->parent[s->depth - 1].activeChild].obj)));
-		s->parent[s->depth - 1].children[s->parent[s->depth - 1].activeChild].obj =
-		UA_NULL;
-	}
-	return UA_SUCCESS;
-}
+//UA_Int32 UA_NodeSetReferences_decodeXML(XML_Stack* s, XML_Attr* attr, UA_NodeSetReferences* dst, _Bool isStart) {
+//	DBG_VERBOSE(printf("UA_NodeSetReferences entered with dst=%p,isStart=%d\n", (void* ) dst, isStart));
+//	if (isStart) {
+//		if (dst == UA_NULL) {
+//			UA_NodeSetReferences_new(&dst);
+//			s->parent[s->depth - 1].children[s->parent[s->depth - 1].activeChild].obj = (void*) dst;
+//		}
+//		s->parent[s->depth].len = 0;
+//		XML_Stack_addChildHandler(s, "Reference", (XML_decoder) UA_ReferenceNode_decodeXML, UA_REFERENCENODE, UA_NULL);
+//	} else {
+//		// sub element is ready, add to array
+//		if (dst->size < 0 || dst->size == 0) {
+//			dst->size = 1;
+//			UA_alloc((void** )&(dst->references), dst->size * sizeof(UA_ReferenceNode*));
+//			DBG_VERBOSE(
+//					printf("allocate references:dst=%p, aliases=%p, size=%d\n", (void* )dst, (void* )(dst->references),
+//							dst->size));
+//		} else {
+//			dst->size++;
+//			dst->references = realloc(dst->references, dst->size * sizeof(UA_NodeSetAlias*));
+//			DBG_VERBOSE(
+//					printf("reallocate references:dst=%p, aliases=%p, size=%d\n", (void* )dst,
+//							(void* )(dst->references), dst->size));
+//		}
+//		// index starts with 0, therefore size-1
+//		DBG_VERBOSE(printf("assign alias:dst=%p, src=%p\n", (void* )dst->references[dst->size - 1], (void* )attr));
+//		dst->references[dst->size - 1] = (UA_ReferenceNode*) attr;
+//		// TODO: It is a design flaw that we need to do this here, isn't it?
+//		DBG_VERBOSE(
+//				printf("UA_NodeSetReferences clears %p\n",
+//						(void* ) (s->parent[s->depth - 1].children[s->parent[s->depth - 1].activeChild].obj)));
+//		s->parent[s->depth - 1].children[s->parent[s->depth - 1].activeChild].obj =
+//		UA_NULL;
+//	}
+//	return UA_SUCCESS;
+//}
 
 UA_Int32 UA_TypedArray_decodeXML(XML_Stack* s, XML_Attr* attr, UA_TypedArray* dst, _Bool isStart) {
 	UA_Int32 type = s->parent[s->depth - 1].children[s->parent[s->depth - 1].activeChild].type;
@@ -519,13 +521,8 @@ UA_Int32 UA_TypedArray_decodeXML(XML_Stack* s, XML_Attr* attr, UA_TypedArray* ds
 			UA_TypedArray_setType(dst, type);
 			s->parent[s->depth - 1].children[s->parent[s->depth - 1].activeChild].obj = dst;
 		}
-		// FIXME: when to free name?
-		char* name;
-		UA_alloc(&name,strlen(names));
-		strncpy(name,names,strlen(names));
-		name[strlen(names)-1]=0;
-		DBG_VERBOSE(printf("UA_TypedArray_decodeXML - add handler for %s\n", names));
-		XML_Stack_addChildHandler(s, name, (XML_decoder) UA_[type].decodeXML, type, UA_NULL);
+		DBG_VERBOSE(printf("UA_TypedArray_decodeXML - add handler for %.*s\n", strlen(names)-1, names));
+		XML_Stack_addChildHandler(s, names, strlen(names)-1, (XML_decoder) UA_[type].decodeXML, type, UA_NULL);
 	} else {
 		// sub element is ready, add to array
 		if (dst->size < 0 || dst->size == 0) {
@@ -560,11 +557,11 @@ UA_Int32 UA_DataTypeNode_decodeXML(XML_Stack* s, XML_Attr* attr, UA_DataTypeNode
 		}
 
 		s->parent[s->depth].len = 0;
-		XML_Stack_addChildHandler(s, "DisplayName", (XML_decoder) UA_LocalizedText_decodeXML, UA_LOCALIZEDTEXT, &(dst->displayName));
-		XML_Stack_addChildHandler(s, "Description", (XML_decoder) UA_LocalizedText_decodeXML, UA_LOCALIZEDTEXT, &(dst->description));
-		XML_Stack_addChildHandler(s, "BrowseName", (XML_decoder) UA_QualifiedName_decodeXML, UA_QUALIFIEDNAME, &(dst->description));
-		XML_Stack_addChildHandler(s, "IsAbstract", (XML_decoder) UA_Boolean_decodeXML, UA_BOOLEAN, &(dst->description));
-		XML_Stack_addChildHandler(s, "References", (XML_decoder) UA_TypedArray_decodeXML, UA_REFERENCENODE, UA_NULL);
+		XML_Stack_addChildHandler(s, "DisplayName", strlen("DisplayName"), (XML_decoder) UA_LocalizedText_decodeXML, UA_LOCALIZEDTEXT, &(dst->displayName));
+		XML_Stack_addChildHandler(s, "Description", strlen("Description"),(XML_decoder) UA_LocalizedText_decodeXML, UA_LOCALIZEDTEXT, &(dst->description));
+		XML_Stack_addChildHandler(s, "BrowseName", strlen("BrowseName"),(XML_decoder) UA_QualifiedName_decodeXML, UA_QUALIFIEDNAME, &(dst->description));
+		XML_Stack_addChildHandler(s, "IsAbstract", strlen("IsAbstract"),(XML_decoder) UA_Boolean_decodeXML, UA_BOOLEAN, &(dst->description));
+		XML_Stack_addChildHandler(s, "References", strlen("References"),(XML_decoder) UA_TypedArray_decodeXML, UA_REFERENCENODE, UA_NULL);
 
 		// set missing default attributes
 		dst->nodeClass = UA_NODECLASS_DATATYPE;
@@ -624,16 +621,16 @@ UA_Int32 UA_ObjectNode_decodeXML(XML_Stack* s, XML_Attr* attr, UA_ObjectNode* ds
 		}
 
 		s->parent[s->depth].len = 0;
-		XML_Stack_addChildHandler(s, "DisplayName", (XML_decoder) UA_LocalizedText_decodeXML, UA_LOCALIZEDTEXT,
+		XML_Stack_addChildHandler(s, "DisplayName", strlen("DisplayName"), (XML_decoder) UA_LocalizedText_decodeXML, UA_LOCALIZEDTEXT,
 				&(dst->displayName));
-		XML_Stack_addChildHandler(s, "Description", (XML_decoder) UA_LocalizedText_decodeXML, UA_LOCALIZEDTEXT,
+		XML_Stack_addChildHandler(s, "Description", strlen("Description"), (XML_decoder) UA_LocalizedText_decodeXML, UA_LOCALIZEDTEXT,
 				&(dst->description));
 		// FIXME: no idea how to handle SymbolicName automatically. Seems to me that it is the "real" BrowseName
 		//		XML_Stack_addChildHandler(s, "BrowseName", (XML_decoder) UA_QualifiedName_decodeXML, UA_QUALIFIEDNAME,
 		//				&(dst->browseName));
-		XML_Stack_addChildHandler(s, "SymbolicName", (XML_decoder) UA_QualifiedName_decodeXML, UA_QUALIFIEDNAME,
+		XML_Stack_addChildHandler(s, "SymbolicName", strlen("SymbolicName"), (XML_decoder) UA_QualifiedName_decodeXML, UA_QUALIFIEDNAME,
 				&(dst->browseName));
-		XML_Stack_addChildHandler(s, "References", (XML_decoder) UA_NodeSetReferences_decodeXML, UA_INVALIDTYPE,
+		XML_Stack_addChildHandler(s, "References", strlen("References"), (XML_decoder) UA_TypedArray_decodeXML, UA_REFERENCENODE,
 		UA_NULL);
 
 		// set missing default attributes
@@ -660,11 +657,10 @@ UA_Int32 UA_ObjectNode_decodeXML(XML_Stack* s, XML_Attr* attr, UA_ObjectNode* ds
 		switch (s->parent[s->depth - 1].activeChild) {
 		case 3: // References
 		if (attr != UA_NULL) {
-			UA_NodeSetReferences* references = (UA_NodeSetReferences*) attr;
-			DBG_VERBOSE(
-					printf("finished aliases: references=%p, size=%d\n",(void*)references,(references==UA_NULL)?-1:references->size));
-			dst->referencesSize = references->size;
-			dst->references = references->references;
+			UA_TypedArray* array = (UA_TypedArray*) attr;
+			DBG_VERBOSE(printf("finished aliases: references=%p, size=%d\n",(void*)array,(array==UA_NULL)?-1:array->size));
+			dst->referencesSize = array->size;
+			dst->references = (UA_ReferenceNode**) array->elements;
 		}
 			break;
 		default:
@@ -693,8 +689,8 @@ UA_Int32 UA_Variant_decodeXML(XML_Stack* s, XML_Attr* attr, UA_Variant* dst, _Bo
 		}
 
 		s->parent[s->depth].len = 0;
-		XML_Stack_addChildHandler(s, "ListOfExtensionObject", (XML_decoder) UA_TypedArray_decodeXML, UA_EXTENSIONOBJECT, UA_NULL);
-		XML_Stack_addChildHandler(s, "ListOfLocalizedText", (XML_decoder) UA_TypedArray_decodeXML, UA_LOCALIZEDTEXT, UA_NULL);
+		XML_Stack_addChildHandler(s, "ListOfExtensionObject", strlen("ListOfExtensionObject"), (XML_decoder) UA_TypedArray_decodeXML, UA_EXTENSIONOBJECT, UA_NULL);
+		XML_Stack_addChildHandler(s, "ListOfLocalizedText", strlen("ListOfLocalizedText"), (XML_decoder) UA_TypedArray_decodeXML, UA_LOCALIZEDTEXT, UA_NULL);
 
 		// set attributes
 		for (i = 0; attr[i]; i += 2) {
@@ -745,14 +741,14 @@ UA_Int32 UA_VariableNode_decodeXML(XML_Stack* s, XML_Attr* attr, UA_VariableNode
 		}
 
 		s->parent[s->depth].len = 0;
-		XML_Stack_addChildHandler(s, "DisplayName", (XML_decoder) UA_LocalizedText_decodeXML, UA_LOCALIZEDTEXT,
+		XML_Stack_addChildHandler(s, "DisplayName", strlen("DisplayName"), (XML_decoder) UA_LocalizedText_decodeXML, UA_LOCALIZEDTEXT,
 				&(dst->displayName));
-		XML_Stack_addChildHandler(s, "Description", (XML_decoder) UA_LocalizedText_decodeXML, UA_LOCALIZEDTEXT,
+		XML_Stack_addChildHandler(s, "Description", strlen("Description"),(XML_decoder) UA_LocalizedText_decodeXML, UA_LOCALIZEDTEXT,
 				&(dst->description));
-		XML_Stack_addChildHandler(s, "DataType", (XML_decoder) UA_NodeId_decodeXML, UA_NODEID, &(dst->dataType));
-		XML_Stack_addChildHandler(s, "ValueRank", (XML_decoder) UA_Int32_decodeXML, UA_INT32, &(dst->valueRank));
-		XML_Stack_addChildHandler(s, "Value", (XML_decoder) UA_Variant_decodeXML, UA_VARIANT, &(dst->value));
-		XML_Stack_addChildHandler(s, "References", (XML_decoder) UA_NodeSetReferences_decodeXML, UA_INVALIDTYPE,
+		XML_Stack_addChildHandler(s, "DataType", strlen("DataType"),(XML_decoder) UA_NodeId_decodeXML, UA_NODEID, &(dst->dataType));
+		XML_Stack_addChildHandler(s, "ValueRank", strlen("ValueRank"),(XML_decoder) UA_Int32_decodeXML, UA_INT32, &(dst->valueRank));
+		XML_Stack_addChildHandler(s, "Value", strlen("Value"),(XML_decoder) UA_Variant_decodeXML, UA_VARIANT, &(dst->value));
+		XML_Stack_addChildHandler(s, "References", strlen("References"), (XML_decoder) UA_TypedArray_decodeXML, UA_REFERENCENODE,
 		UA_NULL);
 
 		// set missing default attributes
@@ -786,11 +782,10 @@ UA_Int32 UA_VariableNode_decodeXML(XML_Stack* s, XML_Attr* attr, UA_VariableNode
 		switch (s->parent[s->depth - 1].activeChild) {
 		case 5: // References
 		if (attr != UA_NULL) {
-			UA_NodeSetReferences* references = (UA_NodeSetReferences*) attr;
-			DBG_VERBOSE(
-					printf("finished aliases: references=%p, size=%d\n",(void*)references,(references==UA_NULL)?-1:references->size));
-			dst->referencesSize = references->size;
-			dst->references = references->references;
+			UA_TypedArray* array = (UA_TypedArray*) attr;
+			DBG_VERBOSE(printf("finished aliases: references=%p, size=%d\n",(void*)array,(array==UA_NULL)?-1:array->size));
+			dst->referencesSize = array->size;
+			dst->references = (UA_ReferenceNode**) array->elements;
 		}
 			break;
 		default:
@@ -852,8 +847,8 @@ UA_Int32 UA_NodeSetAlias_decodeXML(XML_Stack* s, XML_Attr* attr, UA_NodeSetAlias
 		}
 		// set handlers
 		s->parent[s->depth].len = 0;
-		XML_Stack_addChildHandler(s, "Alias", (XML_decoder) UA_String_decodeXML, UA_STRING, &(dst->alias));
-		XML_Stack_addChildHandler(s, "Value", (XML_decoder) UA_String_decodeXML, UA_STRING, &(dst->value));
+		XML_Stack_addChildHandler(s, "Alias", strlen("Alias"), (XML_decoder) UA_String_decodeXML, UA_STRING, &(dst->alias));
+		XML_Stack_addChildHandler(s, "Value", strlen("Value"), (XML_decoder) UA_String_decodeXML, UA_STRING, &(dst->value));
 		XML_Stack_handleTextAsElementOf(s, "Data", 1);
 
 		// set attributes
@@ -886,7 +881,7 @@ UA_Int32 UA_NodeSetAliases_decodeXML(XML_Stack* s, XML_Attr* attr, UA_NodeSetAli
 			s->parent[s->depth - 1].children[s->parent[s->depth - 1].activeChild].obj = (void*) dst;
 		}
 		s->parent[s->depth].len = 0;
-		XML_Stack_addChildHandler(s, "Alias", (XML_decoder) UA_NodeSetAlias_decodeXML, UA_INVALIDTYPE, UA_NULL);
+		XML_Stack_addChildHandler(s, "Alias", strlen("Alias"), (XML_decoder) UA_NodeSetAlias_decodeXML, UA_INVALIDTYPE, UA_NULL);
 	} else {
 		// sub element is ready, add to array
 		if (dst->size < 0 || dst->size == 0) {
@@ -923,10 +918,10 @@ UA_Int32 UA_NodeSet_decodeXML(XML_Stack* s, XML_Attr* attr, UA_NodeSet* dst, _Bo
 			s->parent[s->depth - 1].children[s->parent[s->depth - 1].activeChild].obj = (void*) dst;
 		}
 		s->parent[s->depth].len = 0;
-		XML_Stack_addChildHandler(s, "Aliases", (XML_decoder) UA_NodeSetAliases_decodeXML, UA_INVALIDTYPE,
+		XML_Stack_addChildHandler(s, "Aliases", strlen("Aliases"), (XML_decoder) UA_NodeSetAliases_decodeXML, UA_INVALIDTYPE,
 				&(dst->aliases));
-		XML_Stack_addChildHandler(s, "UADataType", (XML_decoder) UA_DataTypeNode_decodeXML, UA_DATATYPENODE, UA_NULL);
-		XML_Stack_addChildHandler(s, "UAVariable", (XML_decoder) UA_VariableNode_decodeXML, UA_VARIABLENODE, UA_NULL);
+		XML_Stack_addChildHandler(s, "UADataType", strlen("UADataType"), (XML_decoder) UA_DataTypeNode_decodeXML, UA_DATATYPENODE, UA_NULL);
+		XML_Stack_addChildHandler(s, "UAVariable", strlen("UAVariable"), (XML_decoder) UA_VariableNode_decodeXML, UA_VARIABLENODE, UA_NULL);
 	} else {
 		switch (s->parent[s->depth - 1].activeChild) {
 		case 0: // Aliases
@@ -966,7 +961,7 @@ void XML_Stack_startElement(void * data, const char *el, const char **attr) {
 // scan expected children
 	XML_Parent* cp = &s->parent[s->depth];
 	for (i = 0; i < cp->len; i++) {
-		if (0 == strncmp(cp->children[i].name, el, strlen(cp->children[i].name))) {
+		if (0 == strncmp(cp->children[i].name, el, cp->children[i].length)) {
 			DBG_VERBOSE(XML_Stack_print(s));
 			DBG_VERBOSE(printf("%s - processing\n", el));
 
