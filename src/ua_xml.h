@@ -67,8 +67,41 @@ UA_Int32 UA_ExpandedNodeId_copycstring(cstring src, UA_ExpandedNodeId* dst, UA_N
 
 void XML_Stack_init(XML_Stack* p, cstring name);
 void XML_Stack_print(XML_Stack* s);
+
+/** @brief add a reference to a handler (@see XML_Stack_addChildHandler) for text data
+ *
+ * Assume a XML structure such as
+ *     <LocalizedText>
+ *          <Locale></Locale>
+ *          <Text>Server</Text>
+ *     </LocalizedText>
+ * which might be abbreviated as
+ *     <LocalizedText>Server</LocalizedText>
+ *
+ * We would add two (@ref XML_Stack_addChildHandler), one for Locale (index 0) and one for Text (index 1),
+ * both to be handled by (@ref UA_String_decodeXML) with elements "Data" and "Length". To handle the
+ * abbreviation we add
+ *   	XML_Stack_handleTextAsElementOf(s,"Data",1)
+ *
+ * @param[in] s the stack
+ * @param[in] textAttrib the name of the element of the handler at position textAttribIdx
+ * @param[in] textAttribIdx the index of the handler
+ */
 void XML_Stack_handleTextAsElementOf(XML_Stack* p, cstring textAttrib, unsigned int textAttribIdx);
-void XML_Stack_addChildHandler(XML_Stack* p, cstring name, UA_Int32 length, XML_decoder handler, UA_Int32 type, void* dst);
+
+/** @brief make a handler known to the XML-stack on the current level
+ *
+ * The current level is given by s->depth, the maximum number of children is a predefined constant.
+ * A combination of type=UA_INVALIDTYPE and dst=UA_NULL is valid for special handlers only
+ *
+ * @param[in] s the stack
+ * @param[in] name the name of the element
+ * @param[in] nameLength the length of the element name
+ * @param[in] handler the decoder routine for this element
+ * @param[in] type the open62541-type of the element, UA_INVALIDTYPE if not in the VTable
+ * @param[out] dst the address of the object for the data, handlers will allocate object if UA_NULL
+ */
+void XML_Stack_addChildHandler(XML_Stack* p, cstring name, UA_Int32 nameLength, XML_decoder handler, UA_Int32 type, void* dst);
 
 void XML_Stack_startElement(void * data, const char *el, const char **attr);
 UA_Int32 XML_isSpace(cstring s, int len);
