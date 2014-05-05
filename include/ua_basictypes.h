@@ -335,6 +335,10 @@ typedef struct UA_Variant {
 } UA_Variant;
 UA_TYPE_METHOD_PROTOTYPES (UA_Variant)
 
+UA_Int32 UA_Variant_setValue(UA_Variant *v, UA_Int32 type, const void* data); // Take care! Data is freed together with the Variant
+UA_Int32 UA_Variant_copySetValue(UA_Variant *v, UA_Int32 type, const void* data);
+UA_Int32 UA_Variant_setArray(UA_Variant *v, UA_Int32 type, UA_Int32 arrayLength, const void* data); // Take care! Data is freed together with the Variant
+UA_Int32 UA_Variant_copySetArray(UA_Variant *v, UA_Int32 type_id, UA_Int32 arrayLength, UA_UInt32 elementSize, const void* array);
 
 /** LocalizedTextBinaryEncoding - Part: 6, Chapter: 5.2.2.14, Page: 21 */
 enum UA_LOCALIZEDTEXT_ENCODINGMASKTYPE_enum
