@@ -24,13 +24,17 @@ UA_Int32 UA_UInt16_copycstring(cstring src, UA_UInt16* dst) ;
 
 void print_node(UA_Node const * node);
 
+/** @brief an object to hold a typed array
+ *
+ */
 typedef struct UA_TypedArray {
 	UA_Int32 size;
 	UA_VTable* vt;
 	void** elements;
 } UA_TypedArray;
-
+/** @brief init typed array with size=-1 and an UA_INVALIDTYPE */
 UA_Int32 UA_TypedArray_init(UA_TypedArray* p);
+/** @brief allocate memory for the array header only */
 UA_Int32 UA_TypedArray_new(UA_TypedArray** p);
 UA_Int32 UA_TypedArray_setType(UA_TypedArray* p, UA_Int32 type);
 UA_Int32 UA_TypedArray_decodeXML(XML_Stack* s, XML_Attr* attr, UA_TypedArray* dst, _Bool isStart);
@@ -52,16 +56,6 @@ UA_Int32 UA_NodeSet_init(UA_NodeSet* p);
 UA_Int32 UA_NodeSet_new(UA_NodeSet** p);
 UA_Int32 UA_NodeId_copycstring(cstring src, UA_NodeId* dst, UA_NodeSetAliases* aliases);
 UA_Int32 UA_NodeSet_decodeXML(XML_Stack* s, XML_Attr* attr, UA_NodeSet* dst, _Bool isStart);
-
-typedef struct UA_NodeSetReferences {
-	UA_Int32 size;
-	UA_ReferenceNode** references;
-} UA_NodeSetReferences;
-UA_Int32 UA_NodeSetReferences_init(UA_NodeSetReferences* p);
-UA_Int32 UA_NodeSetReferences_new(UA_NodeSetReferences** p);
-UA_Int32 UA_NodeSetReferences_println(cstring label, UA_NodeSetReferences *p);
-
-UA_Int32 UA_ReferenceNode_println(cstring label, UA_ReferenceNode *a);
 
 UA_Int32 UA_ExpandedNodeId_copycstring(cstring src, UA_ExpandedNodeId* dst, UA_NodeSetAliases* aliases);
 

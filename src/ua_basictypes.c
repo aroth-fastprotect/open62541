@@ -1102,7 +1102,6 @@ UA_Int32 UA_ExtensionObject_copy(UA_ExtensionObject const  *src, UA_ExtensionObj
 	retval |= UA_NodeId_copy(&(src->typeId),&(dst->typeId));
 	return retval;
 }
-UA_TYPE_METHOD_DECODEXML_NOTIMPL(UA_ExtensionObject)
 
 /** DiagnosticInfo - Part: 4, Chapter: 7.9, Page: 116 */
 UA_Int32 UA_DiagnosticInfo_calcSize(UA_DiagnosticInfo const * ptr) {
