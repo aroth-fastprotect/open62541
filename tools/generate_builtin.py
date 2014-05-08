@@ -77,43 +77,43 @@ def printableStructuredType(element):
 # There three types of types in the bsd file:
 # StructuredType, EnumeratedType OpaqueType
 
-def createEnumerated(element):
-	valuemap = OrderedDict()
-	name = "UA_" + element.get("Name")
-	enum_types.append(name)
-	print("\n/** @name UA_" + name + " */", end='\n', file=fh)
-	for child in element:
-		if child.tag == "{http://opcfoundation.org/BinarySchema/}Documentation":
-			print("/** @brief " + child.text + " */", end='\n', file=fh)
-		if child.tag == "{http://opcfoundation.org/BinarySchema/}EnumeratedValue":
-			valuemap[name + "_" + child.get("Name")] = child.get("Value")
-	valuemap = OrderedDict(sorted(valuemap.iteritems(), key=lambda (k,v): int(v)))
-	print("typedef UA_UInt32 " + name + ";", end='\n', file=fh);
-	print("enum " + name + "_enum { \n\t" + ",\n\t".join(map(lambda (key, value) : key.upper() + " = " + value, valuemap.iteritems())) + "\n};", end='\n', file=fh)
-	print("UA_TYPE_METHOD_PROTOTYPES (" + name + ")", end='\n', file=fh)
-	print("UA_TYPE_METHOD_CALCSIZE_AS("+name+", UA_UInt32)", end='\n', file=fc)
-	print("UA_TYPE_METHOD_ENCODEBINARY_AS("+name+", UA_UInt32)", end='\n', file=fc)
-	print("UA_TYPE_METHOD_DECODEBINARY_AS("+name+", UA_UInt32)", end='\n', file=fc)
-	print("UA_TYPE_METHOD_DELETE_AS("+name+", UA_UInt32)", end='\n', file=fc)
-	print("UA_TYPE_METHOD_DELETEMEMBERS_AS("+name+", UA_UInt32)", end='\n', file=fc)
-	print("UA_TYPE_METHOD_INIT_AS("+name+", UA_UInt32)", end='\n', file=fc)
-	print("UA_TYPE_METHOD_COPY_AS("+name+", UA_UInt32)",'\n', file=fc)  
-	print("UA_TYPE_METHOD_NEW_DEFAULT("+name+")\n", end='\n', file=fc)
+def createEnumerated(element):	
+    valuemap = OrderedDict()
+    name = "UA_" + element.get("Name")
+    enum_types.append(name)
+    print("\n/** @name UA_" + name + " */", end='\n', file=fh)
+    for child in element:
+        if child.tag == "{http://opcfoundation.org/BinarySchema/}Documentation":
+            print("/** @brief " + child.text + " */", end='\n', file=fh)
+        if child.tag == "{http://opcfoundation.org/BinarySchema/}EnumeratedValue":
+            valuemap[name + "_" + child.get("Name")] = child.get("Value")
+    valuemap = OrderedDict(sorted(valuemap.iteritems(), key=lambda (k,v): int(v)))
+    print("typedef UA_UInt32 " + name + ";", end='\n', file=fh);
+    print("enum " + name + "_enum { \n\t" + ",\n\t".join(map(lambda (key, value) : key.upper() + " = " + value, valuemap.iteritems())) + "\n};", end='\n', file=fh)
+    print("UA_TYPE_METHOD_PROTOTYPES (" + name + ")", end='\n', file=fh)
+    print("UA_TYPE_METHOD_CALCSIZE_AS("+name+", UA_UInt32)", end='\n', file=fc)
+    print("UA_TYPE_METHOD_ENCODEBINARY_AS("+name+", UA_UInt32)", end='\n', file=fc)
+    print("UA_TYPE_METHOD_DECODEBINARY_AS("+name+", UA_UInt32)", end='\n', file=fc)
+    print("UA_TYPE_METHOD_DELETE_AS("+name+", UA_UInt32)", end='\n', file=fc)
+    print("UA_TYPE_METHOD_DELETEMEMBERS_AS("+name+", UA_UInt32)", end='\n', file=fc)
+    print("UA_TYPE_METHOD_INIT_AS("+name+", UA_UInt32)", end='\n', file=fc)
+    print("UA_TYPE_METHOD_COPY_AS("+name+", UA_UInt32)",'\n', file=fc)  
+    print("UA_TYPE_METHOD_NEW_DEFAULT("+name+")\n", end='\n', file=fc)
 	# need to generate code here
-	print("UA_TYPE_METHOD_DECODEXML_NOTIMPL("+name+")", end='\n', file=fc)
-	return
-	
+    print("UA_TYPE_METHOD_DECODEXML_NOTIMPL("+name+")", end='\n', file=fc)
+    return
+    
 def createStructured(element):
-	valuemap = OrderedDict()
-	name = "UA_" + element.get("Name")
-	print("\n/** @name UA_" + name + " */", end='\n', file=fh)
+    valuemap = OrderedDict()
+    name = "UA_" + element.get("Name")
+    print("\n/** @name UA_" + name + " */", end='\n', file=fh)
 
-	lengthfields = set()
-	for child in element:
+    lengthfields = set()
+    for child in element:
 		if child.get("LengthField"):
 			lengthfields.add(child.get("LengthField"))
 	
-	for child in element:
+    for child in element:
 		if child.tag == "{http://opcfoundation.org/BinarySchema/}Documentation":
 			print("/** @brief " + child.text + " */", end='\n', file=fh)
 		elif child.tag == "{http://opcfoundation.org/BinarySchema/}Field":
@@ -132,33 +132,33 @@ def createStructured(element):
 	#	print ("type " + name + " is new Request_Base with "),
 	# else:
 	#	print ("type " + name + " is new UA_Builtin with "),
-	print("typedef struct " + name + " {", end='\n', file=fh)
-	if len(valuemap) == 0:
+    print("typedef struct " + name + " {", end='\n', file=fh)
+    if len(valuemap) == 0:
 		typename = stripTypename(element.get("BaseType"))
 		childname = camlCase2CCase(typename)
 		valuemap[childname] = typename 
-	for n,t in valuemap.iteritems():
+    for n,t in valuemap.iteritems():
 		if t.find("**") != -1:
 			print("\t" + "UA_Int32 " + n + "Size;", end='\n', file=fh)
 		print("\t" + "UA_" + t + " " + n + ";", end='\n', file=fh)
-	print("} " + name + ";", end='\n', file=fh)
+    print("} " + name + ";", end='\n', file=fh)
 
-	print("UA_Int32 " + name + "_calcSize(" + name + " const* ptr);", end='\n', file=fh)
-	print("UA_Int32 " + name + "_encodeBinary(" + name + " const* src, UA_Int32* pos, UA_ByteString* dst);", end='\n', file=fh)
-	print("UA_Int32 " + name + "_decodeBinary(UA_ByteString const* src, UA_Int32* pos, " + name + "* dst);", end='\n', file=fh)
-	print("UA_Int32 " + name + "_decodeXML(XML_Stack* s, XML_Attr* attr, " + name + "* dst, _Bool isStart);", end='\n', file=fh)
-	print("UA_Int32 " + name + "_delete("+ name + "* p);", end='\n', file=fh)
-	print("UA_Int32 " + name + "_deleteMembers(" + name + "* p);", end='\n', file=fh)
-	print("UA_Int32 " + name + "_init("+ name + " * p);", end='\n', file=fh)
-	print("UA_Int32 " + name + "_new(" + name + " ** p);", end='\n', file=fh)
-	print("UA_Int32 " + name + "_copy(" + name + "* src, " + name + "* dst);", end='\n', file=fh)
+    print("UA_Int32 " + name + "_calcSize(" + name + " const* ptr);", end='\n', file=fh)
+    print("UA_Int32 " + name + "_encodeBinary(" + name + " const* src, UA_Int32* pos, UA_ByteString* dst);", end='\n', file=fh)
+    print("UA_Int32 " + name + "_decodeBinary(UA_ByteString const* src, UA_Int32* pos, " + name + "* dst);", end='\n', file=fh)
+    print("UA_Int32 " + name + "_decodeXML(XML_Stack* s, XML_Attr* attr, " + name + "* dst, _Bool isStart);", end='\n', file=fh)
+    print("UA_Int32 " + name + "_delete("+ name + "* p);", end='\n', file=fh)
+    print("UA_Int32 " + name + "_deleteMembers(" + name + "* p);", end='\n', file=fh)
+    print("UA_Int32 " + name + "_init("+ name + " * p);", end='\n', file=fh)
+    print("UA_Int32 " + name + "_new(" + name + " ** p);", end='\n', file=fh)
+    print("UA_Int32 " + name + "_copy(" + name + "* src, " + name + "* dst);", end='\n', file=fh)
 
-	print("UA_Int32 "  + name + "_calcSize(" + name + " const * ptr) {", end='', file=fc)
-	print("\n\tif(ptr==UA_NULL){return sizeof("+ name +");}", end='', file=fc)
-	print("\n\treturn 0", end='', file=fc)
+    print("UA_Int32 "  + name + "_calcSize(" + name + " const * ptr) {", end='', file=fc)
+    print("\n\tif(ptr==UA_NULL){return sizeof("+ name +");}", end='', file=fc)
+    print("\n\treturn 0", end='', file=fc)
 
 	# code _calcSize
-	for n,t in valuemap.iteritems():
+    for n,t in valuemap.iteritems():
 		if t in elementary_size:
 			print('\n\t + sizeof(UA_' + t + ") // " + n, end='', file=fc)
 		else:
@@ -172,11 +172,11 @@ def createStructured(element):
 			else:
 				print('\n\t + ' + "UA_" + t + "_calcSize(&(ptr->" + n + '))', end='', file=fc)
 
-	print("\n\t;\n}\n", end='\n', file=fc)
+    print("\n\t;\n}\n", end='\n', file=fc)
 
-	print("UA_Int32 "+name+"_encodeBinary("+name+" const * src, UA_Int32* pos, UA_ByteString* dst) {\n\tUA_Int32 retval = UA_SUCCESS;", end='\n', file=fc)
+    print("UA_Int32 "+name+"_encodeBinary("+name+" const * src, UA_Int32* pos, UA_ByteString* dst) {\n\tUA_Int32 retval = UA_SUCCESS;", end='\n', file=fc)
 	# code _encode
-	for n,t in valuemap.iteritems():
+    for n,t in valuemap.iteritems():
 		if t in elementary_size:
 			print('\tretval |= UA_'+t+'_encodeBinary(&(src->'+n+'),pos,dst);', end='\n', file=fc)
 		else:
@@ -189,12 +189,12 @@ def createStructured(element):
 				print('\tretval |= UA_' + t[0:t.find("*")] + "_encodeBinary(src->" + n + ',pos,dst);', end='\n', file=fc)
 			else:
 				print('\tretval |= UA_'+t+"_encodeBinary(&(src->"+n+"),pos,dst);", end='\n', file=fc)
-	print("\treturn retval;\n}\n", end='\n', file=fc)
+    print("\treturn retval;\n}\n", end='\n', file=fc)
 
 	# code _decodeBinary
-	print("UA_Int32 "+name+"_decodeBinary(UA_ByteString const * src, UA_Int32* pos, " + name + "* dst) {\n\tUA_Int32 retval = UA_SUCCESS;", end='\n', file=fc)
-	print('\t'+name+'_init(dst);', end='\n', file=fc)
-	for n,t in valuemap.iteritems():
+    print("UA_Int32 "+name+"_decodeBinary(UA_ByteString const * src, UA_Int32* pos, " + name + "* dst) {\n\tUA_Int32 retval = UA_SUCCESS;", end='\n', file=fc)
+    print('\t'+name+'_init(dst);', end='\n', file=fc)
+    for n,t in valuemap.iteritems():
 		if t in elementary_size:
 			print('\tCHECKED_DECODE(UA_'+t+'_decodeBinary(src,pos,&(dst->'+n+')), '+name+'_deleteMembers(dst));', end='\n', file=fc)
 		else:
@@ -212,10 +212,10 @@ def createStructured(element):
 				print('\tCHECKED_DECODE(UA_' + t[0:t.find("*")] + "_decodeBinary(src,pos,dst->"+ n +"), "+name+'_deleteMembers(dst));', end='\n', file=fc)
 			else:
 				print('\tCHECKED_DECODE(UA_'+t+"_decodeBinary(src,pos,&(dst->"+n+")), "+name+'_deleteMembers(dst));', end='\n', file=fc)
-	print("\treturn retval;\n}\n", end='\n', file=fc)
+    print("\treturn retval;\n}\n", end='\n', file=fc)
 
 	# code _decodeXML
-	if generateDecodeXml(name):
+    if generateDecodeXml(name):
 		print("UA_Int32 "+name+"_decodeXML(XML_Stack* s, XML_Attr* attr, " + name + "* dst, _Bool isStart)", end='\n', file=fc)
 		print('''{
 	DBG_VERBOSE(printf("'''+name+'''_decodeXML entered with dst=%p,isStart=%d\\n", (void* ) dst, isStart));
@@ -277,7 +277,7 @@ def createStructured(element):
 # }''', end='\n', file=fc)
 	
 	# code _delete and _deleteMembers
-	print('UA_Int32 '+name+'_delete('+name+'''* p) 
+    print('UA_Int32 '+name+'_delete('+name+'''* p) 
 {
 	UA_Int32 retval = UA_SUCCESS;
 	retval |= '''+name+'''_deleteMembers(p);
@@ -285,8 +285,8 @@ def createStructured(element):
 	return retval;
 }''', end='\n', file=fc)
 	
-	print("UA_Int32 "+name+"_deleteMembers(" + name + "* p) {\n\tUA_Int32 retval = UA_SUCCESS;", end='\n', file=fc)
-	for n,t in valuemap.iteritems():
+    print("UA_Int32 "+name+"_deleteMembers(" + name + "* p) {\n\tUA_Int32 retval = UA_SUCCESS;", end='\n', file=fc)
+    for n,t in valuemap.iteritems():
 		if t not in elementary_size:
 			if t.find("**") != -1:
 				print("\tretval |= UA_Array_delete((void***)&p->"+n+",p->"+n+"Size,UA_"+t[0:t.find("*")].upper()+"); p->"+n+" = UA_NULL;", end='\n', file=fc) #not tested
@@ -295,11 +295,11 @@ def createStructured(element):
 			else:
 				print('\tretval |= UA_' + t + "_deleteMembers(&(p->"+n+"));", end='\n', file=fc)
 		
-	print("\treturn retval;\n}\n", end='\n', file=fc)
+    print("\treturn retval;\n}\n", end='\n', file=fc)
 
 	# code _init
-	print("UA_Int32 "+name+"_init(" + name + " * p) {\n\tUA_Int32 retval = UA_SUCCESS;", end='\n', file=fc)
-	for n,t in valuemap.iteritems():
+    print("UA_Int32 "+name+"_init(" + name + " * p) {\n\tUA_Int32 retval = UA_SUCCESS;", end='\n', file=fc)
+    for n,t in valuemap.iteritems():
 		if t in elementary_size:
 			print('\tretval |= UA_'+t+'_init(&(p->'+n+'));', end='\n', file=fc)
 		else:
@@ -312,13 +312,13 @@ def createStructured(element):
 				print("\tp->"+n+"=UA_NULL;", end='\n', file=fc)
 			else:
 				print('\tretval |= UA_'+t+"_init(&(p->"+n+"));", end='\n', file=fc)
-	print("\treturn retval;\n}\n", end='\n', file=fc)
+    print("\treturn retval;\n}\n", end='\n', file=fc)
 
 	# code _new
-	print("UA_TYPE_METHOD_NEW_DEFAULT(" + name + ")", end='\n', file=fc)
+    print("UA_TYPE_METHOD_NEW_DEFAULT(" + name + ")", end='\n', file=fc)
 	# code _copy
-	print("UA_Int32 "+name+"_copy(" + name + " * src," + name + " * dst) {\n\tUA_Int32 retval = UA_SUCCESS;", end='\n', file=fc)
-	for n,t in valuemap.iteritems():
+    print("UA_Int32 "+name+"_copy(" + name + " * src," + name + " * dst) {\n\tUA_Int32 retval = UA_SUCCESS;", end='\n', file=fc)
+    for n,t in valuemap.iteritems():
 		if t in elementary_size:
 			print('\tretval |= UA_'+t+'_copy(&(src->'+n+'),&(dst->'+n+'));', end='\n', file=fc)
 		else:
@@ -331,14 +331,14 @@ def createStructured(element):
 				print('\tretval |= UA_' + t[0:t.find("*")] + '_copy(src->' + n + ',dst->' + n + ');', end='\n', file=fc)
 			else:
 				print('\tretval |= UA_'+t+"_copy(&(src->"+n+"),&(dst->" + n + '));', end='\n', file=fc)
-	print("\treturn retval;\n}\n", end='\n', file=fc)
+    print("\treturn retval;\n}\n", end='\n', file=fc)
 	
 def createOpaque(element):
-	name = "UA_" + element.get("Name")
-	print("\n/** @name UA_" + name + " */", end='\n', file=fh)
-	for child in element:
-		if child.tag == "{http://opcfoundation.org/BinarySchema/}Documentation":
-			print("/** @brief " + child.text + " */", end='\n', file=fh)
+    name = "UA_" + element.get("Name")
+    print("\n/** @name UA_" + name + " */", end='\n', file=fh)
+    for child in element:
+        if child.tag == "{http://opcfoundation.org/BinarySchema/}Documentation":
+            print("/** @brief " + child.text + " */", end='\n', file=fh)
 
 	print("typedef UA_ByteString " + name + ";", end='\n', file=fh)
 	print("UA_TYPE_METHOD_PROTOTYPES (" + name + ")", end='\n', file=fh)

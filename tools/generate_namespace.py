@@ -2,20 +2,15 @@ from __future__ import print_function
 import sys
 import platform
 import getpass
-from collections import OrderedDict
 import time
-import re
-import csv
-from itertools import tee
 
 if len(sys.argv) != 3:
 	print("Usage: python generate_namespace.py <path/to/NodeIds.csv> <outfile w/o extension>", file=sys.stdout)
 	exit(0)
 
 # types that are to be excluded
-exclude_kind = set(["Object","ObjectType","Variable","Method","ReferenceType"])
-exclude_types = set(["Number", 
-	"Integer", "UInteger", "Enumeration",
+exclude_kinds = set(["Object","ObjectType","Variable","Method","ReferenceType"])
+exclude_types = set(["Number", "Integer", "UInteger", "Enumeration",
 	"Image", "ImageBMP", "ImageGIF", "ImageJPG", "ImagePNG",
 	"References", "BaseVariableType", "BaseDataVariableType", 
 	"PropertyType", "DataTypeDescriptionType", "DataTypeDictionaryType", "NamingRuleType",
@@ -34,21 +29,14 @@ exclude_types = set(["Number",
 	"YArrayItemType", "XYArrayItemType", "ImageItemType", "CubeItemType", "NDimensionArrayItemType"
 	])
 	
-def skipKind(name):
-	if name in exclude_kind:
-		return True
-	return False
-	
-def skipType(name):
-	if name in exclude_types:
-		return True
-	return False
-
 f = open(sys.argv[1])
-rows1, rows2, rows3 = tee(csv.reader(f), 3)
+input_str = f.read() + "\nInvalidType,0,DataType"
+input_str = input_str.replace('\r','')
+rows = map(lambda x:tuple(x.split(',')), input_str.split('\n'))
+f.close()
 
-fh = open(sys.argv[2] + ".hgen",'w');
-fc = open(sys.argv[2] + ".cgen",'w');
+fh = open(sys.argv[2] + ".hgen",'w')
+fc = open(sys.argv[2] + ".cgen",'w')
 
 print('''/**********************************************************
  * '''+sys.argv[2]+'''.hgen -- do not modify
@@ -60,7 +48,7 @@ print('''/**********************************************************
 #ifndef OPCUA_NAMESPACE_0_H_
 #define OPCUA_NAMESPACE_0_H_
 
-#include "opcua.h"  // definition of UA_VTable and basic UA_Types
+#include "ua_basictypes.h"  // definition of UA_VTable and basic UA_Types
 
 /**
  * @brief maps namespace zero nodeId to index into UA_VTable
@@ -72,6 +60,9 @@ print('''/**********************************************************
  */
 UA_Int32 UA_ns0ToVTableIndex(UA_Int32 id);
 extern UA_VTable UA_[]; 
+
+static UA_Int32 phantom_delete(void * p) { return UA_SUCCESS; }
+extern UA_VTable UA_noDelete_[];
 
 /**
  * @brief the set of possible indices into UA_VTable
@@ -94,78 +85,80 @@ UA_Int32 UA_ns0ToVTableIndex(UA_Int32 ns0Id) {
 	switch (ns0Id) { ''', end='\n',file=fc)
 
 i = 0
-for row in rows1:
-	if skipKind(row[2]):
-		continue
-
-	if skipType(row[0]):
-		continue
+for row in rows:
+    if row[0] == "" or row[0] in exclude_types or row[2] in exclude_kinds:
+        continue
+    if row[0] == "BaseDataType":
+    	name = "UA_Variant"
+    elif row[0] == "Structure":
+        name = "UA_ExtensionObject"
+    else:
+        name = "UA_" + row[0]
 	
-	if row[0] == "BaseDataType":
-		name = "UA_Variant"
-	elif row[0] == "Structure":
-		name = "UA_ExtensionObject" 
-	else:	
-		name = "UA_" + row[0]
-	
-	print("\t"+name.upper()+"="+str(i)+",", file=fh)
-	print('\tcase '+row[1]+': retval='+name.upper()+'; break; //'+row[2], file=fc)
-	i = i+1
+    print("\t"+name.upper()+" = "+str(i)+",", file=fh)
+    print('\tcase '+row[1]+': retval='+name.upper()+'; break; //'+row[2], file=fc)
+    i = i+1
 
-print('\tUA_INVALIDTYPE = '+str(i)+'\n};\n', file=fh)
-print('''\tcase 0: retval=UA_INVALIDTYPE; break;
-	}
-	return retval;
+print("};\n", file=fh)
+print('''
+    }
+    return retval;
 }
 
 UA_VTable UA_[] = {''', file=fc)
 
-for row in rows2:
-	if skipKind(row[2]):
-		continue
+for row in rows:
+    if row[0] == "" or row[0] in exclude_types or row[2] in exclude_kinds:
+        continue
+    if row[0] == "BaseDataType":
+    	name = "UA_Variant"
+    elif row[0] == "Structure":
+        name = "UA_ExtensionObject"
+    else:
+        name = "UA_" + row[0]
 
-	if skipType(row[0]):
-		continue
+    print('#define '+name.upper()+'_NS0 '+row[1], file=fh)
 
-	if row[0] == "BaseDataType":
-		name = "UA_Variant"
-	elif row[0] == "Structure":
-		name = "UA_ExtensionObject" 
-	else:	
-		name = "UA_" + row[0]
+    print("\t{" +
+		  '(UA_Byte*)"'+name+'"'+
+		  "," + row[1] + 
+          ",(UA_Int32(*)(void const*))"+name+"_calcSize" + 
+          ",(UA_Int32(*)(UA_ByteString const*,UA_Int32*,void*))"+name+ "_decodeBinary" +
+          ",(UA_Int32(*)(void const*,UA_Int32*,UA_ByteString*))"+name+"_encodeBinary"+
+		  ",(UA_Int32(*)(XML_Stack*,XML_Attr*,void*,_Bool))"+name+ "_decodeXML" +
+          ",(UA_Int32(*)(void *))"+name+"_init"+
+          ",(UA_Int32(*)(void **))"+name+"_new"+
+		  ",(UA_Int32(*)(void const * ,void*))"+name+"_copy"+
+          ",(UA_Int32(*)(void *))"+name+"_delete"+
+          '},',end='\n',file=fc) 
 
-	print('#define '+name.upper()+'_NS0 '+row[1], file=fh)
+print("};\n\nUA_VTable UA_noDelete_[] = {", end='\n', file=fc)
 
-	print("\t{"
-		'(UA_Byte*)"'+name+'"'+
-		"," + row[1] + 
-		",(UA_Int32(*)(void const*))"+name+"_calcSize" + 
-		",(UA_Int32(*)(UA_ByteString const*,UA_Int32*,void*))"+name+ "_decodeBinary" +
-		",(UA_Int32(*)(void const*,UA_Int32*,UA_ByteString*))"+name+"_encodeBinary"+
-		",(UA_Int32(*)(XML_Stack*,XML_Attr*,void*,_Bool))"+name+ "_decodeXML" +
-		",(UA_Int32(*)(void *))"+name+"_init"+
-		",(UA_Int32(*)(void **))"+name+"_new"+
-		",(UA_Int32(*)(void const * ,void*))"+name+"_copy"+
-		",(UA_Int32(*)(void *))"+name+"_delete"+
-		"},", end='\n',file=fc)
-	 
-name = "UA_InvalidType"
-print("\t{" + 
-		'(UA_Byte*)"'+name+'"'+
-		",0" + 
-		",(UA_Int32(*)(void const*))"+name+"_calcSize" + 
-		",(UA_Int32(*)(UA_ByteString const*,UA_Int32*,void*))"+name+ "_decodeBinary" +
-		",(UA_Int32(*)(void const*,UA_Int32*,UA_ByteString*))"+name+"_encodeBinary"+
-		",(UA_Int32(*)(XML_Stack*,XML_Attr*,void*,_Bool))"+name+ "_decodeXML" +
-		",(UA_Int32(*)(void *))"+name+"_init"+
-		",(UA_Int32(*)(void **))"+name+"_new"+
-		",(UA_Int32(*)(void const * ,void*))"+name+"_copy"+
-		",(UA_Int32(*)(void *))"+name+"_delete"+
-		"},", end='\n',file=fc)
+for row in rows:
+    if row[0] == "" or row[0] in exclude_types or row[2] in exclude_kinds:
+        continue
+    if row[0] == "BaseDataType":
+        name = "UA_Variant"
+    elif row[0] == "Structure":
+        name = "UA_ExtensionObject"
+    else:	
+	name = "UA_" + row[0]
+
+    print("\t{" +
+		  '(UA_Byte*)"'+name+'"'+
+ 		  "," + row[1] +
+          ",(UA_Int32(*)(void const*))"+name+"_calcSize" + 
+          ",(UA_Int32(*)(UA_ByteString const*,UA_Int32*,void*))"+name+ "_decodeBinary" +
+          ",(UA_Int32(*)(void const*,UA_Int32*,UA_ByteString*))"+name+"_encodeBinary"+
+		  ",(UA_Int32(*)(XML_Stack*,XML_Attr*,void*,_Bool))"+name+ "_decodeXML" +
+          ",(UA_Int32(*)(void *))"+name+"_init"+
+          ",(UA_Int32(*)(void **))"+name+"_new"+
+          ",(UA_Int32(*)(void const * ,void*))"+name+"_copy"+
+          ",(UA_Int32(*)(void *))phantom_delete"+
+          '},',end='\n',file=fc)
 print("};", end='\n', file=fc) 
 
-print('#define '+name.upper()+'_NS0 0', file=fh)
-print('#endif /* OPCUA_NAMESPACE_0_H_ */', end='\n', file=fh)
+print('\n#endif /* OPCUA_NAMESPACE_0_H_ */', end='\n', file=fh)
+
 fh.close()
 fc.close()
-f.close()
