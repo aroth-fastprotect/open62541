@@ -301,6 +301,7 @@ typedef struct UA_VTable {
 	UA_Int32 (*new)(void ** p);
 	UA_Int32 (*copy)(void const *src,void *dst);
 	UA_Int32 (*delete)(void * p);
+	UA_UInt32 memSize; // size of the struct only in memory (no dynamic components)
 } UA_VTable;
 
 /* VariantBinaryEncoding - Part: 6, Chapter: 5.2.2.16, Page: 22 */
