@@ -30,13 +30,20 @@ static inline void Namespace_Lock_release(Namespace_Lock * lock) {
 typedef UA_list_List Namespace_TransactionContext;
 UA_Int32 Namespace_TransactionContext_init(Namespace_TransactionContext * tc);
 
-/* Each namespace is a hash-map of NodeIds to Nodes. Every entry in the hashmap consists of a
-   pointer to a read-write lock and a pointer to the Node. */
+/** @brief a function that implements the strategy pattern to access the application memory */
+typedef void* (*Namespace_access_strategy)(void* p);
+
+/** @brief Each namespace is a hash-map of NodeIds to Nodes.
+ *
+ * Every entry in the hashmap consists of a pointer to a read-write lock, a pointer to the Node,
+ * an access function and the associated address in the applications memory */
 typedef struct Namespace_Entry {
 #ifdef MULTITHREADING
 	Namespace_Lock *lock;	/* locks are heap-allocated */
 #endif
 	UA_Node *node;
+	Namespace_access_strategy access;
+	void* data;
 } Namespace_Entry;
 
 typedef struct Namespace {
@@ -67,6 +74,14 @@ void Namespace_remove(Namespace * ns, UA_NodeId * nodeid);
 	by their NodeId. After the Node is no longer used, the lock needs to be
 	released. */
 UA_Int32 Namespace_get(Namespace const *ns, const UA_NodeId * nodeid, UA_Node const **result, Namespace_Lock ** lock);
+
+/** @brief Retrieve the application memory associated with the node from the
+ *  namespace. Nodes are identified by their NodeId. After the Node is no
+ *  longer used, the lock needs to be released. */
+UA_Int32 Namespace_getData(Namespace const *ns, const UA_NodeId * nodeid, void **data, Namespace_Lock ** lock);
+
+/** @brief attach the address of the application memory and an access strategy to the node given by id */
+UA_Int32 Namespace_attachData(Namespace const * ns, UA_Int32 id, Namespace_access_strategy f, void* p, Namespace_Lock ** lock);
 
 /** @brief Retrieve a node (read and write) from the namespace. Nodes are
 	identified by their NodeId. After the Node is no longer used, the lock needs

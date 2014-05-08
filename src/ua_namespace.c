@@ -406,18 +406,53 @@ UA_Int32 Namespace_insert(Namespace * ns, UA_Node * node) {
 	return UA_SUCCESS;
 }
 
-UA_Int32 Namespace_get(Namespace const *ns, const UA_NodeId * nodeid, UA_Node const **result, Namespace_Lock ** lock) {
-	Namespace_Entry *slot;
-	if(find_slot(ns, &slot, nodeid) != UA_SUCCESS)
+
+UA_Int32 Namespace_getSlot(Namespace const *ns, const UA_NodeId * nodeid, Namespace_Entry **slot, Namespace_Lock ** lock) {
+	if(find_slot(ns, slot, nodeid) != UA_SUCCESS)
 		return UA_ERROR;
 
 #ifdef MULTITHREADING
-	if(pthread_rwlock_rdlock((pthread_rwlock_t *) slot->lock) != 0)
+	if(pthread_rwlock_rdlock((pthread_rwlock_t *) (*slot)->lock) != 0)
 		return UA_ERROR;
-	*lock = slot->lock;
+	*lock = (*slot)->lock;
 #endif
+	return UA_SUCCESS;
+}
 
+
+UA_Int32 Namespace_get(Namespace const *ns, const UA_NodeId * nodeid, UA_Node const **result, Namespace_Lock ** lock) {
+	Namespace_Entry *slot;
+	if(Namespace_getSlot(ns, nodeid, &slot, lock) != UA_SUCCESS)
+		return UA_ERROR;
 	*result = slot->node;
+	return UA_SUCCESS;
+}
+
+UA_Int32 Namespace_getData(Namespace const *ns, const UA_NodeId * nodeid, void **result, Namespace_Lock ** lock) {
+	Namespace_Entry *slot;
+	if(Namespace_getSlot(ns, nodeid, &slot, lock) != UA_SUCCESS)
+		return UA_ERROR;
+	*result = slot->data;
+	return UA_SUCCESS;
+}
+
+//FIXME: this should work with other nodeid-types as well, shouldn't it?
+//TODO: Do we really need the lock here?
+UA_Int32 Namespace_attachData(Namespace const * ns, UA_Int32 id, Namespace_access_strategy f, void* p, Namespace_Lock ** lock) {
+	UA_NodeId nodeid;
+	nodeid.encodingByte = UA_NODEIDTYPE_FOURBYTE;
+	nodeid.namespace = ns->namespaceId;
+	nodeid.identifier.numeric = id;
+
+	Namespace_Entry *slot;
+	if(Namespace_getSlot(ns, &nodeid, &slot, lock) != UA_SUCCESS)
+		return UA_ERROR;
+	slot->access = f;
+	slot->data = p;
+#ifdef MULTITHREADING
+	if(pthread_rwlock_unlock((pthread_rwlock_t *) slot->lock) != 0)
+		return UA_ERROR;
+#endif
 	return UA_SUCCESS;
 }
 
