@@ -8,7 +8,7 @@
 
 static inline UA_Int32 UA_VTable_isValidType(UA_Int32 type) {
 	if(type < 0 /* UA_BOOLEAN */ || type > 271 /* UA_INVALID */)
-		return UA_INVALIDTYPE;
+		return UA_ERR_INVALID_VALUE;
 	return UA_SUCCESS;
 }
 
@@ -1056,8 +1056,11 @@ UA_TYPE_START_ENCODEBINARY(UA_ExtensionObject)
 	case UA_EXTENSIONOBJECT_ENCODINGMASK_NOBODYISENCODED:
 		break;
 	case UA_EXTENSIONOBJECT_ENCODINGMASK_BODYISBYTESTRING:
+		// FIXME: This code is valid for numeric nodeIds in ns0 only!
+		retval |= UA_[UA_ns0ToVTableIndex(src->typeId.identifier.numeric)].encodeBinary(src->body.data,pos,dst);
+		break;
 	case UA_EXTENSIONOBJECT_ENCODINGMASK_BODYISXML:
-		retval |= UA_ByteString_encodeBinary(&(src->body),pos,dst);
+		perror("UA_ExtensionObject_encodeBinary - requested encoding of body as XML not yet supported!");
 		break;
 	}
 UA_TYPE_END_XXCODEBINARY
@@ -1386,12 +1389,12 @@ UA_Int32 UA_QualifiedName_copy(UA_QualifiedName const *src, UA_QualifiedName *ds
 UA_Int32 UA_Variant_calcSize(UA_Variant const * p) {
 	UA_Int32 length = 0;
 	if (p == UA_NULL) return sizeof(UA_Variant);
-	UA_UInt32 ns0Id = p->encodingMask & 0x1F; // Bits 1-5
+	UA_UInt32 builtinNs0Id = p->encodingMask & 0x3F; // Bits 0-5
 	UA_Boolean isArray = p->encodingMask & (0x01 << 7); // Bit 7
 	UA_Boolean hasDimensions = p->encodingMask & (0x01 << 6); // Bit 6
 	UA_Int32 i;
 
-	if (p->vt == UA_NULL || ns0Id != p->vt->ns0Id) {
+	if (p->vt == UA_NULL || builtinNs0Id != p->vt->ns0Id) {
 		return UA_ERR_INCONSISTENT;
 	}
 	length += sizeof(UA_Byte); //p->encodingMask

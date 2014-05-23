@@ -54,8 +54,12 @@ typedef struct UA_NodeSet {
 } UA_NodeSet;
 UA_Int32 UA_NodeSet_init(UA_NodeSet* p);
 UA_Int32 UA_NodeSet_new(UA_NodeSet** p);
-UA_Int32 UA_NodeId_copycstring(cstring src, UA_NodeId* dst, UA_NodeSetAliases* aliases);
 UA_Int32 UA_NodeSet_decodeXML(XML_Stack* s, XML_Attr* attr, UA_NodeSet* dst, _Bool isStart);
+
+UA_Int32 UA_NodeId_copycstring(cstring src, UA_NodeId* dst, UA_NodeSetAliases* aliases);
+
+/** @brief determines if node id is a element of table 1, IEC 62541-6 */
+_Bool UA_NodeId_isBuiltinType(UA_NodeId* nodeid);
 
 UA_Int32 UA_ExpandedNodeId_copycstring(cstring src, UA_ExpandedNodeId* dst, UA_NodeSetAliases* aliases);
 

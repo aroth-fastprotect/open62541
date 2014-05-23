@@ -431,7 +431,7 @@ UA_TYPE_METHOD_PROTOTYPES(UA_IdentifierType)
 typedef struct UA_ExtensionObject {
 	UA_NodeId typeId;
 	UA_Byte encoding; //Type of the enum UA_ExtensionObjectEncodingMaskType
-	UA_ByteString body;
+	UA_ByteString body; // contains either the bytestring or a pointer to the memory-object
 } UA_ExtensionObject;
 UA_TYPE_METHOD_PROTOTYPES(UA_ExtensionObject)
 

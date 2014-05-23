@@ -669,6 +669,13 @@ UA_Int32 UA_ExtensionObject_decodeXML(XML_Stack* s, XML_Attr* attr, UA_Extension
 	return UA_SUCCESS;
 }
 
+_Bool UA_NodeId_isBuiltinType(UA_NodeId* nodeid) {
+	return (nodeid->namespace == 0 &&
+			nodeid->identifier.numeric >= UA_BOOLEAN_NS0 &&
+			nodeid->identifier.numeric <= UA_DIAGNOSTICINFO_NS0
+			);
+}
+
 UA_Int32 UA_VariableNode_decodeXML(XML_Stack* s, XML_Attr* attr, UA_VariableNode* dst, _Bool isStart) {
 	DBG_VERBOSE(printf("UA_VariableNode entered with dst=%p,isStart=%d\n", (void* ) dst, isStart));
 	UA_UInt32 i;
@@ -700,6 +707,13 @@ UA_Int32 UA_VariableNode_decodeXML(XML_Stack* s, XML_Attr* attr, UA_VariableNode
 				UA_NodeId_copycstring(attr[i + 1], &(dst->nodeId), s->aliases);
 			} else if (0 == strncmp("DataType", attr[i], strlen("DataType"))) {
 				UA_NodeId_copycstring(attr[i + 1], &(dst->dataType), s->aliases);
+				if (UA_NodeId_isBuiltinType(&(dst->dataType))) {
+					dst->value.encodingMask = dst->dataType.identifier.numeric;
+					dst->value.vt = &UA_[UA_ns0ToVTableIndex(dst->dataType.identifier.numeric)];
+				} else {
+					dst->value.encodingMask = UA_EXTENSIONOBJECT_NS0;
+					dst->value.vt = &UA_[UA_EXTENSIONOBJECT];
+				}
 			} else if (0 == strncmp("ValueRank", attr[i], strlen("ValueRank"))) {
 				dst->valueRank = atoi(attr[i + 1]);
 			} else if (0 == strncmp("ParentNodeId", attr[i], strlen("ParentNodeId"))) {
