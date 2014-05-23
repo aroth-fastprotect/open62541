@@ -152,7 +152,7 @@ UA_Int32 UAX_NodeId_encodeBinaryByMetaData(Namespace const * ns, UA_NodeId const
 		UA_Int32 nComp = 0;
 		if ((retval = Namespace_getNumberOfComponents(ns,id,&nComp)) == UA_SUCCESS) {
 			for (i=0; i < nComp; i++) {
-				UA_NodeId* comp;
+				UA_NodeId* comp = UA_NULL;
 				Namespace_getComponent(ns,id,i,&comp);
 				UAX_NodeId_encodeBinaryByMetaData(ns,comp, pos, dst);
 			}
@@ -222,7 +222,7 @@ int main() {
 	UA_DateTime tEnd = UA_DateTime_now();
 	UA_Double tDelta = ( tEnd - tStart ) / ( 10.0 * i);
 
-	printf("encode server node %d times: time/enc=%f ns, retval=%d",i, tDelta, retval);
+	printf("encode server node %d times: time/enc=%f us, retval=%d\n",i, tDelta, retval);
 	DBG(buffer.length=pos);
 	DBG(UA_ByteString_printx(", result=", &buffer));
 
