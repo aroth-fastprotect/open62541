@@ -220,8 +220,9 @@ int main() {
 		retval |= UAX_NodeId_encodeBinary(n.ns,&nodeid,&pos,&buffer);
 	}
 	UA_DateTime tEnd = UA_DateTime_now();
+	UA_Double tDelta = ( tEnd - tStart ) / ( 10.0 * i);
 
-	DBG(printf("encode server node %d times: time/enc=%f ns, retval=%d",i, (tEnd-tStart) / (10.0 * i),retval));
+	printf("encode server node %d times: time/enc=%f ns, retval=%d",i, tDelta, retval);
 	DBG(buffer.length=pos);
 	DBG(UA_ByteString_printx(", result=", &buffer));
 
