@@ -25,13 +25,13 @@ char* buildNumber = "999-" __DATE__ "-001" ;
 } while(0)
 
 void sam_attach(Namespace *ns,UA_Int32 ns0id,UA_Int32 type, void* p) {
-	Namespace_Lock* lock;
+	Namespace_Entry_Lock* lock;
 	UA_NodeId nodeid;
 	nodeid.namespace = ns->namespaceId;
 	nodeid.identifier.numeric = ns0id;
 	nodeid.encodingByte = UA_NODEIDTYPE_FOURBYTE;
-	UA_Node* result;
-	Namespace_getWritable(ns,&nodeid,&result,&lock);
+	const UA_Node *result;
+	Namespace_get(ns,&nodeid,&result,&lock);
 	if (result->nodeClass == UA_NODECLASS_VARIABLE) {
 		UA_VariableNode* variable = (UA_VariableNode*) result;
 		if (variable->dataType.identifier.numeric == UA_[type].ns0Id) {
@@ -63,7 +63,7 @@ void sam_attach(Namespace *ns,UA_Int32 ns0id,UA_Int32 type, void* p) {
 	} else {
 		perror("Namespace_getWritable returned wrong node class");
 	}
-	Namespace_Lock_release(lock);
+	Namespace_Entry_Lock_release(lock);
 }
 
 void sam_init(Namespace* ns) {
@@ -145,7 +145,7 @@ UA_Int32 UAX_NodeId_encodeBinaryByMetaData(Namespace const * ns, UA_NodeId const
 	UA_Int32 i, retval = UA_SUCCESS;
 	if (UA_NodeId_isBasicType(id)) {
 		UA_Node const * result;
-		Namespace_Lock* lock;
+		Namespace_Entry_Lock* lock;
 		if ((retval = Namespace_get(ns,id,&result,&lock)) == UA_SUCCESS)
 			UA_Variant_encodeBinary(&((UA_VariableNode *) result)->value,pos,dst);
 	} else {
@@ -164,13 +164,13 @@ UA_Int32 UAX_NodeId_encodeBinaryByMetaData(Namespace const * ns, UA_NodeId const
 UA_Int32 UAX_NodeId_encodeBinary(Namespace const * ns, UA_NodeId const * id, UA_Int32* pos, UA_ByteString *dst) {
 	UA_Int32 retval = UA_SUCCESS;
 	UA_Node const * node;
-	Namespace_Lock* lock;
+	Namespace_Entry_Lock* lock;
 
 	if ((retval = Namespace_get(ns,id,&node,&lock)) == UA_SUCCESS) {
 		if (node->nodeClass == UA_NODECLASS_VARIABLE) {
 			retval = UA_Variant_encodeBinary(&((UA_VariableNode*) node)->value,pos,dst);
 		}
-		Namespace_Lock_release(lock);
+		Namespace_Entry_Lock_release(lock);
 	}
 	return retval;
 }
@@ -181,7 +181,7 @@ int main() {
 	XML_Stack s;
 	XML_Stack_init(&s, "ROOT");
 	UA_NodeSet n;
-	UA_NodeSet_init(&n);
+	UA_NodeSet_init(&n, 99); // we don't really need the nsid here
 	XML_Stack_addChildHandler(&s, "UANodeSet", strlen("UANodeSet"), (XML_decoder) UA_NodeSet_decodeXML, UA_INVALIDTYPE, &n);
 
 	XML_Parser parser = XML_ParserCreate(NULL);

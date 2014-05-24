@@ -26,21 +26,25 @@ typedef struct stackTestFixture {
 } stackTestFixture;
 
 /** write message provided in the gather buffers to a tcp transport layer connection */
+// FIXME: This currently does nothing. The buffer is destroyed at the end of the function.
 UA_Int32 responseMsg(struct TL_Connection const * c, UA_ByteString const * const * gather_buf, UA_UInt32 gather_len) {
 	UA_Int32 retval = UA_SUCCESS;
 	UA_UInt32 total_len = 0;
 
-	stackTestFixture* fixture = (stackTestFixture*) c->connectionHandle;
+	UA_Byte *buf;
+	UA_alloc((void **)&buf, BUFFER_SIZE);
+	UA_ByteString respMsg = {BUFFER_SIZE, buf};
 
 	for (UA_UInt32 i=0; i<gather_len && retval == UA_SUCCESS; ++i) {
 		if (total_len + gather_buf[i]->length < BUFFER_SIZE) {
-			memcpy(&(fixture->respMsg.data[total_len]),gather_buf[i]->data,gather_buf[i]->length);
+			memcpy(&respMsg.data[total_len],gather_buf[i]->data,gather_buf[i]->length);
 			total_len += gather_buf[i]->length;
 		} else {
 			retval = UA_ERR_NO_MEMORY;
 		}
 	}
-	fixture->respMsg.length = total_len;
+	respMsg.length = total_len;
+	UA_ByteString_deleteMembers(&respMsg);
 	return UA_SUCCESS;
 }
 
@@ -57,7 +61,6 @@ stackTestFixture* createFixture() {
 	fixture->connection.localConf.recvBufferSize = BUFFER_SIZE;
 	fixture->connection.localConf.recvBufferSize = BUFFER_SIZE;
 	// FIXME: this works only for architectures where sizeof(UA_Int32) == sizeof(void*)
-	fixture->connection.connectionHandle = (UA_Int32) fixture;
 
 	return fixture;
 }
