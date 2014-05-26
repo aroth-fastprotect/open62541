@@ -82,14 +82,19 @@ UA_Int32 UA_Array_init(void **p,UA_Int32 noElements, UA_Int32 type);
 UA_Int32 UA_Array_new(void ***p,UA_Int32 noElements, UA_Int32 type);
 UA_Int32 UA_Array_copy(void const * const *src,UA_Int32 noElements, UA_Int32 type, void ***dst);
 
-struct XML_Stack; // forward declaration for protoytpes
+/* XML prelimiaries */
+struct XML_Stack;
 typedef char const * const XML_Attr;
+typedef char const * cstring;
+#define XML_STACK_MAX_DEPTH 10
+#define XML_STACK_MAX_CHILDREN 40
+typedef UA_Int32 (*XML_decoder)(struct XML_Stack* s, XML_Attr* attr, void* dst, UA_Boolean isStart);
 
 #define UA_TYPE_METHOD_PROTOTYPES(TYPE) \
 	UA_Int32 TYPE##_calcSize(TYPE const * ptr);							\
 	UA_Int32 TYPE##_encodeBinary(TYPE const * src, UA_Int32* pos, UA_ByteString * dst);	\
 	UA_Int32 TYPE##_decodeBinary(UA_ByteString const * src, UA_Int32* pos, TYPE * dst);	\
-	UA_Int32 TYPE##_decodeXML(struct XML_Stack* s, XML_Attr* attr, TYPE* dst, _Bool isStart); \
+	UA_Int32 TYPE##_decodeXML(struct XML_Stack* s, XML_Attr* attr, TYPE* dst, UA_Boolean isStart); \
 	UA_Int32 TYPE##_delete(TYPE * p);									\
 	UA_Int32 TYPE##_deleteMembers(TYPE * p);							\
 	UA_Int32 TYPE##_init(TYPE * p);										\
@@ -135,15 +140,15 @@ UA_Int32 TYPE##_decodeBinary(UA_ByteString const * src, UA_Int32* pos, TYPE *dst
 }
 
 #define UA_TYPE_METHOD_DECODEXML_NOTIMPL(TYPE) \
-UA_Int32 TYPE##_decodeXML(XML_Stack* s, XML_Attr* attr, TYPE* dst, _Bool isStart) { \
-	DBG_VERBOSE(printf(#TYPE "_decodeXML entered with dst=%p,isStart=%d\n", (void* ) dst, isStart)); \
-	return UA_ERR_NOT_IMPLEMENTED;\
-}
+	UA_Int32 TYPE##_decodeXML(XML_Stack* s, XML_Attr* attr, TYPE* dst, _Bool isStart) { \
+		DBG_VERBOSE(printf(#TYPE "_decodeXML entered with dst=%p,isStart=%d\n", (void* ) dst, isStart)); \
+		return UA_ERR_NOT_IMPLEMENTED;\
+	}
 
 #define UA_TYPE_METHOD_DECODEXML_AS(TYPE,TYPE_AS) \
-UA_Int32 TYPE##_decodeXML(struct XML_Stack* s, XML_Attr* attr, TYPE* dst, _Bool isStart) { \
-	return TYPE_AS##_decodeXML(s,attr,(TYPE_AS*) dst,isStart); \
-}
+	UA_Int32 TYPE##_decodeXML(struct XML_Stack* s, XML_Attr* attr, TYPE* dst, _Bool isStart) { \
+		return TYPE_AS##_decodeXML(s,attr,(TYPE_AS*) dst,isStart); \
+	}
 
 #define UA_TYPE_METHOD_ENCODEBINARY_AS(TYPE,TYPE_AS) \
 UA_Int32 TYPE##_encodeBinary(TYPE const * src, UA_Int32* pos, UA_ByteString *dst) { \
@@ -159,13 +164,17 @@ UA_Int32 TYPE##_copy(TYPE const *src, TYPE *dst) {return TYPE_AS##_copy((TYPE_AS
 }
 
 #define UA_TYPE_METHOD_PROTOTYPES_AS_WOXML(TYPE, TYPE_AS) \
-UA_TYPE_METHOD_CALCSIZE_AS(TYPE, TYPE_AS) \
-UA_TYPE_METHOD_ENCODEBINARY_AS(TYPE, TYPE_AS) \
-UA_TYPE_METHOD_DECODEBINARY_AS(TYPE, TYPE_AS) \
-UA_TYPE_METHOD_DELETE_AS(TYPE, TYPE_AS) \
-UA_TYPE_METHOD_DELETEMEMBERS_AS(TYPE, TYPE_AS) \
-UA_TYPE_METHOD_INIT_AS(TYPE, TYPE_AS) \
-UA_TYPE_METHOD_COPY_AS(TYPE, TYPE_AS)
+	UA_TYPE_METHOD_CALCSIZE_AS(TYPE, TYPE_AS) \
+	UA_TYPE_METHOD_ENCODEBINARY_AS(TYPE, TYPE_AS) \
+	UA_TYPE_METHOD_DECODEBINARY_AS(TYPE, TYPE_AS) \
+	UA_TYPE_METHOD_DELETE_AS(TYPE, TYPE_AS) \
+	UA_TYPE_METHOD_DELETEMEMBERS_AS(TYPE, TYPE_AS) \
+	UA_TYPE_METHOD_INIT_AS(TYPE, TYPE_AS) \
+	UA_TYPE_METHOD_COPY_AS(TYPE, TYPE_AS)
+
+#define UA_TYPE_METHOD_PROTOTYPES_AS(TYPE, TYPE_AS) \
+	UA_TYPE_METHOD_PROTOTYPES_AS_WOXML(TYPE, TYPE_AS) \
+	UA_TYPE_METHOD_DECODEXML_AS(TYPE, TYPE_AS)
 
 #define UA_TYPE_METHOD_PROTOTYPES_AS(TYPE, TYPE_AS) \
 UA_TYPE_METHOD_PROTOTYPES_AS_WOXML(TYPE, TYPE_AS) \
@@ -199,6 +208,7 @@ UA_TYPE_METHOD_PROTOTYPES (UA_Int64)
 UA_TYPE_METHOD_PROTOTYPES (UA_UInt64)
 UA_TYPE_METHOD_PROTOTYPES (UA_Float)
 UA_TYPE_METHOD_PROTOTYPES (UA_Double)
+
 /**
 * StatusCodeBinaryEncoding
 * Part: 6
@@ -219,12 +229,10 @@ UA_TYPE_METHOD_PROTOTYPES (UA_IntegerId)
  *
  *  String - Part: 6, Chapter: 5.2.2.4, Page: 16
  */
-typedef struct UA_String
-{
+typedef struct UA_String {
 	UA_Int32 	length;
 	UA_Byte*	data;
-}
-UA_String;
+} UA_String;
 UA_TYPE_METHOD_PROTOTYPES (UA_String)
 //UA_Int32 UA_String_copy(UA_String const * src, UA_String* dst);
 UA_Int32 UA_String_copycstring(char const * src, UA_String* dst);
@@ -233,104 +241,6 @@ UA_Int32 UA_String_compare(const UA_String *string1, const UA_String *string2);
 void UA_String_printf(char const * label, const UA_String* string);
 void UA_String_printx(char const * label, const UA_String* string);
 void UA_String_printx_hex(char const * label, const UA_String* string);
-
-/* ByteString - Part: 6, Chapter: 5.2.2.7, Page: 17 */
-UA_TYPE_METHOD_PROTOTYPES (UA_ByteString)
-UA_Int32 UA_ByteString_compare(const UA_ByteString *string1, const UA_ByteString *string2);
-//UA_Int32 UA_ByteString_copy(UA_ByteString const * src, UA_ByteString* dst);
-UA_Int32 UA_ByteString_newMembers(UA_ByteString* p, UA_Int32 length);
-extern UA_ByteString UA_ByteString_securityPoliceNone;
-
-
-/** UA_NodeSetAlias - a readable shortcut for NodeIds. A list of aliases
- * is intensively used in the namespace0-xml-files
- * */
-typedef struct UA_NodeSetAlias {
-	UA_String alias;
-	UA_String value;
-} UA_NodeSetAlias;
-UA_TYPE_METHOD_PROTOTYPES (UA_NodeSetAlias)
-
-/** UA_NodeSetAliases - a list of aliases
- * */
-typedef struct UA_NodeSetAliases {
-	UA_Int32 size;
-	UA_NodeSetAlias** aliases;
-} UA_NodeSetAliases;
-UA_TYPE_METHOD_PROTOTYPES (UA_NodeSetAliases)
-
-
-typedef char const * cstring;
-
-#define XML_STACK_MAX_DEPTH 10
-#define XML_STACK_MAX_CHILDREN 40
-typedef UA_Int32 (*XML_decoder)(struct XML_Stack* s, XML_Attr* attr, void* dst, _Bool isStart);
-
-typedef struct XML_child {
-	cstring name;
-	UA_Int32 length;
-	UA_Int32 type;
-	XML_decoder elementHandler;
-	void* obj;
-} XML_child;
-
-typedef struct XML_Parent {
-	cstring name;
-	int textAttribIdx; // -1 - not set
-	cstring textAttrib;
-	int activeChild; // -1 - no active child
-	int len; // -1 - empty set
-	XML_child children[XML_STACK_MAX_CHILDREN];
-} XML_Parent;
-
-
-typedef struct XML_Stack {
-	int depth;
-	XML_Parent parent[XML_STACK_MAX_DEPTH];
-	UA_NodeSetAliases* aliases; // shall point to the aliases of the NodeSet after reading
-} XML_Stack;
-
-typedef struct UA_VTable {
-	UA_Byte* name;
-	UA_UInt32 ns0Id;
-	UA_Int32 (*calcSize)(void const * ptr);
-	UA_Int32 (*decodeBinary)(UA_ByteString const * src, UA_Int32* pos, void* dst);
-	UA_Int32 (*encodeBinary)(void const * src, UA_Int32* pos, UA_ByteString* dst);
-	UA_Int32 (*decodeXML)(XML_Stack* s, XML_Attr* attr, void* dst, _Bool isStart);
-	UA_Int32 (*init)(void * p);
-	UA_Int32 (*new)(void ** p);
-	UA_Int32 (*copy)(void const *src,void *dst);
-	UA_Int32 (*delete)(void * p);
-	UA_UInt32 memSize; // size of the struct only in memory (no dynamic components)
-} UA_VTable;
-
-/* VariantBinaryEncoding - Part: 6, Chapter: 5.2.2.16, Page: 22 */
-enum UA_VARIANT_ENCODINGMASKTYPE_enum {
-	UA_VARIANT_ENCODINGMASKTYPE_TYPEID_MASK = 0x3F,	// bits 0:5
-	UA_VARIANT_ENCODINGMASKTYPE_DIMENSIONS = (0x01 << 6), // bit 6
-	UA_VARIANT_ENCODINGMASKTYPE_ARRAY = ( 0x01 << 7) // bit 7
-};
-
-typedef struct UA_Variant {
-	UA_VTable* vt;		// internal entry into vTable
-	UA_Byte encodingMask; 	// Type of UA_Variant_EncodingMaskType_enum
-	UA_Int32 arrayLength;	// total number of elements
-	UA_Int32 arrayDimensionsLength;
-	UA_Int32 **arrayDimensions;
-	void** data;
-} UA_Variant;
-UA_TYPE_METHOD_PROTOTYPES (UA_Variant)
-
-UA_Int32 UA_Variant_copySetValue(UA_Variant *v, UA_Int32 type, const void* data);
-UA_Int32 UA_Variant_copySetArray(UA_Variant *v, UA_Int32 type_id, UA_Int32 arrayLength, UA_UInt32 elementSize, const void* array);
-
-/**
-   @brief Functions UA_Variant_borrowSetValue and ..Array allow to define
- variants whose payload will not be deleted. This is achieved by a second
- vtable. The functionality can be used e.g. when UA_VariableNodes point into a
- "father" structured object that is stored in an UA_VariableNode itself. */
-UA_Int32 UA_Variant_borrowSetValue(UA_Variant *v, UA_Int32 type, const void* data); // Take care not to free the data before the variant.
-UA_Int32 UA_Variant_borrowSetArray(UA_Variant *v, UA_Int32 type, UA_Int32 arrayLength, const void* data); // Take care not to free the data before the variant.
 
 /* ByteString - Part: 6, Chapter: 5.2.2.7, Page: 17 */
 UA_TYPE_METHOD_PROTOTYPES (UA_ByteString)
@@ -386,23 +296,21 @@ typedef struct UA_DateTimeStruct {
 UA_DateTimeStruct UA_DateTime_toStruct(UA_DateTime time);
 UA_Int32 UA_DateTime_toString(UA_DateTime time, UA_String* timeString);
 
-
 typedef struct UA_NodeId {
 	UA_Byte   encodingByte; //enum BID_NodeIdEncodingValuesType
 	UA_UInt16 namespace;
-
     union {
         UA_UInt32 numeric;
         UA_String string;
         UA_Guid guid;
         UA_ByteString byteString;
-    }
-    identifier;
+    } identifier;
 } UA_NodeId;
 UA_TYPE_METHOD_PROTOTYPES (UA_NodeId)
 
 UA_Int32 UA_NodeId_compare(const UA_NodeId *n1, const UA_NodeId *n2);
 void UA_NodeId_printf(char* label, const UA_NodeId* node);
+UA_Boolean UA_NodeId_isNull(const UA_NodeId* p);
 
 /* XmlElement - Part: 6, Chapter: 5.2.2.8, Page: 17 */
 typedef struct UA_XmlElement {
@@ -422,6 +330,7 @@ typedef struct UA_ExpandedNodeId {
 	UA_UInt32 serverIndex;
 } UA_ExpandedNodeId;
 UA_TYPE_METHOD_PROTOTYPES(UA_ExpandedNodeId)
+UA_Boolean UA_ExpandedNodeId_isNull(const UA_ExpandedNodeId* p);
 
 /* IdentifierType */
 typedef UA_Int32 UA_IdentifierType;
@@ -444,10 +353,91 @@ enum UA_ExtensionObject_EncodingMaskType_enum {
 /* QualifiedNameBinaryEncoding - Part: 6, Chapter: 5.2.2.13, Page: 20 */
 typedef struct UA_QualifiedName {
 	UA_UInt16 namespaceIndex;
-	UA_UInt16 reserved;
+	/*UA_UInt16 reserved; removed by Sten since unclear origin*/
 	UA_String name;
 } UA_QualifiedName;
 UA_TYPE_METHOD_PROTOTYPES(UA_QualifiedName)
+
+/* XML Decoding */
+
+/** @brief A readable shortcut for NodeIds. A list of aliases is intensively used in the namespace0-xml-files */
+typedef struct UA_NodeSetAlias {
+	UA_String alias;
+	UA_String value;
+} UA_NodeSetAlias;
+UA_TYPE_METHOD_PROTOTYPES (UA_NodeSetAlias)
+
+/** @brief UA_NodeSetAliases - a list of aliases */
+typedef struct UA_NodeSetAliases {
+	UA_Int32 size;
+	UA_NodeSetAlias** aliases;
+} UA_NodeSetAliases;
+UA_TYPE_METHOD_PROTOTYPES (UA_NodeSetAliases)
+
+typedef struct XML_child {
+	cstring name;
+	UA_Int32 length;
+	UA_Int32 type;
+	XML_decoder elementHandler;
+	void* obj;
+} XML_child;
+
+typedef struct XML_Parent {
+	cstring name;
+	int textAttribIdx; // -1 - not set
+	cstring textAttrib;
+	int activeChild; // -1 - no active child
+	int len; // -1 - empty set
+	XML_child children[XML_STACK_MAX_CHILDREN];
+} XML_Parent;
+
+typedef struct XML_Stack {
+	int depth;
+	XML_Parent parent[XML_STACK_MAX_DEPTH];
+	UA_NodeSetAliases* aliases; // shall point to the aliases of the NodeSet after reading
+} XML_Stack;
+
+typedef struct UA_VTable {
+	UA_Byte* name;
+	UA_UInt32 ns0Id;
+	UA_Int32 (*calcSize)(void const * ptr);
+	UA_Int32 (*decodeBinary)(UA_ByteString const * src, UA_Int32* pos, void* dst);
+	UA_Int32 (*encodeBinary)(void const * src, UA_Int32* pos, UA_ByteString* dst);
+	UA_Int32 (*decodeXML)(XML_Stack* s, XML_Attr* attr, void* dst, UA_Boolean isStart);
+	UA_Int32 (*init)(void * p);
+	UA_Int32 (*new)(void ** p);
+	UA_Int32 (*copy)(void const *src,void *dst);
+	UA_Int32 (*delete)(void * p);
+	UA_UInt32 memSize; // size of the struct only in memory (no dynamic components)
+} UA_VTable;
+
+/* VariantBinaryEncoding - Part: 6, Chapter: 5.2.2.16, Page: 22 */
+enum UA_VARIANT_ENCODINGMASKTYPE_enum {
+	UA_VARIANT_ENCODINGMASKTYPE_TYPEID_MASK = 0x3F,	// bits 0:5
+	UA_VARIANT_ENCODINGMASKTYPE_DIMENSIONS =  (0x01 << 6), // bit 6
+	UA_VARIANT_ENCODINGMASKTYPE_ARRAY =       (0x01 << 7) // bit 7
+};
+
+typedef struct UA_Variant {
+	UA_VTable* vt;		// internal entry into vTable
+	UA_Byte encodingMask; 	// Type of UA_Variant_EncodingMaskType_enum
+	UA_Int32 arrayLength;	// total number of elements
+	UA_Int32 arrayDimensionsLength;
+	UA_Int32 **arrayDimensions;
+	void** data;
+} UA_Variant;
+UA_TYPE_METHOD_PROTOTYPES (UA_Variant)
+
+UA_Int32 UA_Variant_copySetValue(UA_Variant *v, UA_Int32 type, const void* data);
+UA_Int32 UA_Variant_copySetArray(UA_Variant *v, UA_Int32 type_id, UA_Int32 arrayLength, UA_UInt32 elementSize, const void* array);
+
+/**
+   @brief Functions UA_Variant_borrowSetValue and ..Array allow to define
+ variants whose payload will not be deleted. This is achieved by a second
+ vtable. The functionality can be used e.g. when UA_VariableNodes point into a
+ "father" structured object that is stored in an UA_VariableNode itself. */
+UA_Int32 UA_Variant_borrowSetValue(UA_Variant *v, UA_Int32 type, const void* data); // Take care not to free the data before the variant.
+UA_Int32 UA_Variant_borrowSetArray(UA_Variant *v, UA_Int32 type, UA_Int32 arrayLength, const void* data); // Take care not to free the data before the variant.
 
 /* DataValue - Part: 6, Chapter: 5.2.2.17, Page: 23 */
 typedef struct UA_DataValue {

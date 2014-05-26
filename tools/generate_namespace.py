@@ -120,18 +120,18 @@ for row in rows:
     print('#define '+name.upper()+'_NS0 '+row[1], file=fh)
 
     print("\t{" +
-		  '(UA_Byte*)"'+name+'"'+
-		  "," + row[1] + 
-          ",(UA_Int32(*)(void const*))"+name+"_calcSize" + 
-          ",(UA_Int32(*)(UA_ByteString const*,UA_Int32*,void*))"+name+ "_decodeBinary" +
-          ",(UA_Int32(*)(void const*,UA_Int32*,UA_ByteString*))"+name+"_encodeBinary"+
-		  ",(UA_Int32(*)(XML_Stack*,XML_Attr*,void*,_Bool))"+name+ "_decodeXML" +
-          ",(UA_Int32(*)(void *))"+name+"_init"+
-          ",(UA_Int32(*)(void **))"+name+"_new"+
-		  ",(UA_Int32(*)(void const * ,void*))"+name+"_copy"+
-          ",(UA_Int32(*)(void *))"+name+"_delete"+
-		  (",sizeof("+name+")" if (name != "UA_InvalidType") else ",0") +
-          '},',end='\n',file=fc) 
+          '(UA_Byte*)"'+ name +'",' +
+          row[1] + 
+          ",(UA_Int32(*)(void const*))"+ name +"_calcSize" + 
+          ",(UA_Int32(*)(UA_ByteString const*,UA_Int32*,void*))"+ name + "_decodeBinary" +
+          ",(UA_Int32(*)(void const*,UA_Int32*,UA_ByteString*))"+ name +"_encodeBinary"+
+          ",(UA_Int32(*)(XML_Stack*,XML_Attr*,void*,_Bool))"+ name + "_decodeXML" +
+          ",(UA_Int32(*)(void *))" + name + "_init" +
+          ",(UA_Int32(*)(void **))" + name + "_new" +
+	  ",(UA_Int32(*)(void const * ,void*))" + name + "_copy" +
+          ",(UA_Int32(*)(void *))" + name + "_delete" +
+          (",sizeof(" + name + ")" if (name != "UA_InvalidType") else ",0") +
+          "},",end='\n',file=fc) 
 
 print("};\n\nUA_VTable UA_noDelete_[] = {", end='\n', file=fc)
 
@@ -146,18 +146,18 @@ for row in rows:
 	name = "UA_" + row[0]
 
     print("\t{" +
-		  '(UA_Byte*)"'+name+'"'+
- 		  "," + row[1] +
-          ",(UA_Int32(*)(void const*))"+name+"_calcSize" + 
-          ",(UA_Int32(*)(UA_ByteString const*,UA_Int32*,void*))"+name+ "_decodeBinary" +
-          ",(UA_Int32(*)(void const*,UA_Int32*,UA_ByteString*))"+name+"_encodeBinary"+
-		  ",(UA_Int32(*)(XML_Stack*,XML_Attr*,void*,_Bool))"+name+ "_decodeXML" +
-          ",(UA_Int32(*)(void *))"+name+"_init"+
-          ",(UA_Int32(*)(void **))"+name+"_new"+
-          ",(UA_Int32(*)(void const * ,void*))"+name+"_copy"+
-          ",(UA_Int32(*)(void *))phantom_delete"+
-		  (",sizeof("+name+")" if (name != "UA_InvalidType") else ",0") +
-          '},',end='\n',file=fc)
+          '(UA_Byte*)"' + name + '",' +
+          row[1] + 
+          ",(UA_Int32(*)(void const*))" + name + "_calcSize" + 
+          ",(UA_Int32(*)(UA_ByteString const*,UA_Int32*,void*))" + name + "_decodeBinary" +
+          ",(UA_Int32(*)(void const*,UA_Int32*,UA_ByteString*))" + name + "_encodeBinary"+
+          ",(UA_Int32(*)(XML_Stack*,XML_Attr*,void*,_Bool))" + name + "_decodeXML" +
+          ",(UA_Int32(*)(void *))" + name + "_init" +
+          ",(UA_Int32(*)(void **))" + name + "_new" +
+	  ",(UA_Int32(*)(void const * ,void*))" + name + "_copy" +
+          ",(UA_Int32(*)(void *))phantom_delete" +
+          (",sizeof(" + name + ")" if (name != "UA_InvalidType") else ",0") +
+          "},",end='\n',file=fc)
 print("};", end='\n', file=fc) 
 
 print('\n#endif /* OPCUA_NAMESPACE_0_H_ */', end='\n', file=fh)

@@ -64,15 +64,16 @@ UA_Int32 UA_NodeSetAliases_println(cstring label, UA_NodeSetAliases *p) {
 	return UA_SUCCESS;
 }
 
-UA_Int32 UA_NodeSet_init(UA_NodeSet* p) {
-	Namespace_create(&(p->ns), 100);
+UA_Int32 UA_NodeSet_init(UA_NodeSet* p, UA_UInt32 nsid) {
+	Namespace_new(&(p->ns), 100, nsid);
 	p->aliases.size = -1;
 	p->aliases.aliases = UA_NULL;
 	return UA_SUCCESS;
 }
-UA_Int32 UA_NodeSet_new(UA_NodeSet** p) {
+
+UA_Int32 UA_NodeSet_new(UA_NodeSet** p, UA_UInt32 nsid) {
 	UA_alloc((void** )p, sizeof(UA_NodeSet));
-	UA_NodeSet_init(*p);
+	UA_NodeSet_init(*p, nsid);
 	return UA_SUCCESS;
 }
 UA_Int32 UA_NodeId_copycstring(cstring src, UA_NodeId* dst, UA_NodeSetAliases* aliases) {
@@ -168,26 +169,6 @@ void XML_Stack_addChildHandler(XML_Stack* p, cstring name, UA_Int32 length, XML_
 	p->parent[p->depth].children[len].type = type;
 	p->parent[p->depth].children[len].obj = dst;
 	p->parent[p->depth].len++;
-}
-
-UA_Int32 UA_Boolean_copycstring(cstring src, UA_Boolean* dst) {
-	*dst = UA_FALSE;
-	if (0 == strncmp(src, "true", 4) || 0 == strncmp(src, "TRUE", 4)) {
-		*dst = UA_TRUE;
-	}
-	return UA_SUCCESS;
-}
-
-UA_Int32 UA_Boolean_decodeXML(XML_Stack* s, XML_Attr* attr, UA_Boolean* dst, _Bool isStart) {
-	DBG_VERBOSE(printf("UA_Boolean entered with dst=%p,isStart=%d\n", (void* ) dst, isStart));
-	if (isStart) {
-		if (dst == UA_NULL) {
-			UA_Boolean_new(&dst);
-			s->parent[s->depth - 1].children[s->parent[s->depth - 1].activeChild].obj = (void*) dst;
-		}
-		UA_Boolean_copycstring((cstring) attr[1], dst);
-	}
-	return UA_SUCCESS;
 }
 
 UA_Int32 UA_Int16_copycstring(cstring src, UA_Int16* dst) {
@@ -863,7 +844,7 @@ UA_Int32 UA_NodeSet_decodeXML(XML_Stack* s, XML_Attr* attr, UA_NodeSet* dst, _Bo
 	DBG_VERBOSE(printf("UA_NodeSet entered with dst=%p,isStart=%d\n", (void* ) dst, isStart));
 	if (isStart) {
 		if (dst == UA_NULL) {
-			UA_NodeSet_new(&dst);
+			UA_NodeSet_new(&dst, 99); // we don't really need the namespaceid for this..'
 			s->parent[s->depth - 1].children[s->parent[s->depth - 1].activeChild].obj = (void*) dst;
 		}
 		s->parent[s->depth].len = 0;
