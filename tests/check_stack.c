@@ -1,12 +1,22 @@
-/*
- ============================================================================
+/****************************************************************************
  Name        : check_stack.c
- Author      :
- Version     :
+ Author      : uleon @ open62541
+ Version     : 0.1
  Copyright   : Your copyright notice
- Description :
- ============================================================================
- */
+ Description : test cases to check different aspects of the
+ stack indication-response behavior w/o any network aspects
+
+
+```
+ Client            Server
+
+request  o--__
+              --> indication        +
+                                    | <---
+            __--o response          +
+confirm. <--
+```
+*****************************************************************************/
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -20,56 +30,103 @@
 #define MAXMSG 512
 #define BUFFER_SIZE 8192
 
+/** @brief this structure holds all the information for the stack test fixture */
 typedef struct stackTestFixture {
+	/** @brief the actual buffer to receive the response msg */
 	UA_Byte respMsgBuffer[BUFFER_SIZE];
+	/** @brief the management structure (initialized to point to respMsgBuffer in create */
 	UA_ByteString respMsg;
+	/** @brief the management data structure for the fake connection */
 	TL_Connection connection;
 } stackTestFixture;
 
-/** write message provided in the gather buffers to a tcp transport layer connection */
-// FIXME: This currently does nothing. The buffer is destroyed at the end of the function.
-UA_Int32 responseMsg(struct TL_Connection const * c, UA_ByteString const * const * gather_buf, UA_UInt32 gather_len) {
+
+/** @brief the maximum number of parallel fixtures.
+ * ( MAX_FIXTURES needs to match the number of bytes of fixturesMap )*/
+#define MAX_FIXTURES 32
+/** @brief this map marks the slots in fixtures as free (bit=0) or in use (bit=1) */
+UA_Int32 fixturesMap = 0;
+/** @brief the array of pointers to the fixtures */
+stackTestFixture* fixtures[MAX_FIXTURES];
+
+/** @brief search first free handle, set and return */
+UA_Int32 stackTestFixture_getAndMarkFreeHandle() {
+	UA_Int32 freeFixtureHandle = 0;
+
+	for (freeFixtureHandle=0;freeFixtureHandle < MAX_FIXTURES;++freeFixtureHandle) {
+		if (!(fixturesMap & (1 << freeFixtureHandle))) { // when free
+			fixturesMap |= (1 << freeFixtureHandle); // then set
+			return freeFixtureHandle;
+		}
+	}
+	return UA_ERR_NO_MEMORY;
+}
+/** @brief clear bit in fixture map */
+UA_Int32 stackTestFixture_markHandleAsFree(UA_Int32 fixtureHandle) {
+	if (fixtureHandle >= 0 && fixtureHandle < MAX_FIXTURES) {
+		fixturesMap &= ~ (1 << fixtureHandle); // clear bit
+		return UA_SUCCESS;
+	}
+	return UA_ERR_INVALID_VALUE;
+}
+
+/** @brief get a handle to a free slot and create a new stackTestFixture */
+UA_Int32 stackTestFixture_create(TL_Writer writerCallback) {
+	UA_UInt32 fixtureHandle = stackTestFixture_getAndMarkFreeHandle();
+	if (fixtureHandle < MAX_FIXTURES) {
+		UA_alloc((void**)&fixtures[fixtureHandle], sizeof(stackTestFixture));
+		stackTestFixture* fixture = fixtures[fixtureHandle];
+		fixture->respMsg.data = fixture->respMsgBuffer;
+		fixture->respMsg.length = 0;
+		fixture->connection.connectionState = CONNECTIONSTATE_CLOSED;
+		fixture->connection.writerCallback = writerCallback;
+		fixture->connection.localConf.maxChunkCount = 1;
+		fixture->connection.localConf.maxMessageSize = BUFFER_SIZE;
+		fixture->connection.localConf.protocolVersion = 0;
+		fixture->connection.localConf.recvBufferSize = BUFFER_SIZE;
+		fixture->connection.localConf.recvBufferSize = BUFFER_SIZE;
+		fixture->connection.connectionHandle = fixtureHandle;
+	}
+	return fixtureHandle;
+}
+/** @brief free the allocated memory of the stackTestFixture associated with the handle */
+UA_Int32 stackTestFixture_delete(UA_UInt32 fixtureHandle) {
+	if (fixtureHandle < MAX_FIXTURES) {
+		UA_free(fixtures[fixtureHandle]);
+		stackTestFixture_markHandleAsFree(fixtureHandle);
+		return UA_SUCCESS;
+	}
+	return UA_ERR_INVALID_VALUE;
+}
+
+/** @brief return the fixture associated with the handle */
+stackTestFixture* stackTestFixture_getFixture(UA_UInt32 fixtureHandle) {
+	if (fixtureHandle < MAX_FIXTURES && ( fixturesMap & (1 << fixtureHandle)))
+			return fixtures[fixtureHandle];
+	return UA_NULL;
+}
+
+/** @brief write message provided in the gather buffers to the buffer of the fixture */
+UA_Int32 responseMsg(struct TL_Connection * c, UA_ByteString const ** gather_buf, UA_Int32 gather_len) {
 	UA_Int32 retval = UA_SUCCESS;
 	UA_UInt32 total_len = 0;
 
-	UA_Byte *buf;
-	UA_alloc((void **)&buf, BUFFER_SIZE);
-	UA_ByteString respMsg = {BUFFER_SIZE, buf};
+	stackTestFixture* fixture = stackTestFixture_getFixture(c->connectionHandle);
 
-	for (UA_UInt32 i=0; i<gather_len && retval == UA_SUCCESS; ++i) {
+	for (UA_Int32 i=0; i<gather_len && retval == UA_SUCCESS; ++i) {
 		if (total_len + gather_buf[i]->length < BUFFER_SIZE) {
-			memcpy(&respMsg.data[total_len],gather_buf[i]->data,gather_buf[i]->length);
+			memcpy(&(fixture->respMsg.data[total_len]),gather_buf[i]->data,gather_buf[i]->length);
 			total_len += gather_buf[i]->length;
 		} else {
 			retval = UA_ERR_NO_MEMORY;
 		}
 	}
-	respMsg.length = total_len;
-	UA_ByteString_deleteMembers(&respMsg);
+	fixture->respMsg.length = total_len;
 	return UA_SUCCESS;
 }
 
-stackTestFixture* createFixture() {
-	stackTestFixture* fixture;
-	UA_alloc((void**)&fixture, sizeof(stackTestFixture));
-	fixture->respMsg.data = fixture->respMsgBuffer;
-	fixture->respMsg.length = 0;
-	fixture->connection.connectionState = CONNECTIONSTATE_CLOSED;
-	fixture->connection.writerCallback = (TL_Writer) responseMsg;
-	fixture->connection.localConf.maxChunkCount = 1;
-	fixture->connection.localConf.maxMessageSize = BUFFER_SIZE;
-	fixture->connection.localConf.protocolVersion = 0;
-	fixture->connection.localConf.recvBufferSize = BUFFER_SIZE;
-	fixture->connection.localConf.recvBufferSize = BUFFER_SIZE;
-	// FIXME: this works only for architectures where sizeof(UA_Int32) == sizeof(void*)
-
-	return fixture;
-}
-
-
-
-void indicateMsg(stackTestFixture* f, UA_ByteString *slMessage) {
-	TL_Process(&(f->connection), slMessage);
+void indicateMsg(UA_Int32 handle, UA_ByteString *slMessage) {
+	TL_Process(&(stackTestFixture_getFixture(handle)->connection), slMessage);
 }
 
 UA_Byte pkt_HEL[] = {
@@ -291,14 +348,17 @@ UA_Byte pkt_MSG_CreateSession[] = {
 START_TEST(emptyIndicationShallYieldNoResponse)
 {
 	// given
-	stackTestFixture* fixture = createFixture();
+	UA_Int32 handle = stackTestFixture_create(responseMsg);
 	UA_ByteString message = { -1, (UA_Byte*) UA_NULL };
+
 	// when
-	indicateMsg(fixture, &message);
+	indicateMsg(handle, &message);
+
 	// then
-	ck_assert_int_eq(fixture->respMsg.length,0);
+	ck_assert_int_eq(stackTestFixture_getFixture(handle)->respMsg.length,0);
+
 	// finally
-	UA_free(fixture);
+	stackTestFixture_delete(handle);
 }
 END_TEST
 
@@ -306,65 +366,71 @@ END_TEST
 START_TEST(validHELIndicationShallYieldACKResponse)
 {
 	// given
-	stackTestFixture* fixture = createFixture();
+	UA_Int32 handle = stackTestFixture_create(responseMsg);
 	UA_ByteString message_001 = { sizeof(pkt_HEL), pkt_HEL };
 
 	// when
-	indicateMsg(fixture, &message_001);
+	indicateMsg(handle, &message_001);
+
 	// then
-	ck_assert_int_eq(fixture->respMsg.length,28);
-	ck_assert_int_eq(fixture->respMsg.data[0],'A');
-	ck_assert_int_eq(fixture->respMsg.data[1],'C');
-	ck_assert_int_eq(fixture->respMsg.data[2],'K');
+	ck_assert_int_eq(stackTestFixture_getFixture(handle)->respMsg.length,28);
+	ck_assert_int_eq(stackTestFixture_getFixture(handle)->respMsg.data[0],'A');
+	ck_assert_int_eq(stackTestFixture_getFixture(handle)->respMsg.data[1],'C');
+	ck_assert_int_eq(stackTestFixture_getFixture(handle)->respMsg.data[2],'K');
+
 	// finally
-	UA_free(fixture);
+	stackTestFixture_delete(handle);
 }
 END_TEST
 
 START_TEST(validOpeningSequenceShallCreateChannel)
 {
 	// given
-	stackTestFixture* fixture = createFixture();
+	UA_Int32 handle = stackTestFixture_create(responseMsg);
 
 	UA_ByteString message_001 = { sizeof(pkt_HEL), pkt_HEL };
 	UA_ByteString message_002 = { sizeof(pkt_OPN), pkt_OPN };
 
 	// when
-	indicateMsg(fixture, &message_001);
-	indicateMsg(fixture, &message_002);
+	indicateMsg(handle, &message_001);
+	indicateMsg(handle, &message_002);
+
 	// then
-	ck_assert_int_eq(fixture->respMsg.data[0],'O');
-	ck_assert_int_eq(fixture->respMsg.data[1],'P');
-	ck_assert_int_eq(fixture->respMsg.data[2],'N');
-	ck_assert_int_eq(fixture->connection.connectionState, CONNECTIONSTATE_ESTABLISHED);
+	ck_assert_int_eq(stackTestFixture_getFixture(handle)->respMsg.data[0],'O');
+	ck_assert_int_eq(stackTestFixture_getFixture(handle)->respMsg.data[1],'P');
+	ck_assert_int_eq(stackTestFixture_getFixture(handle)->respMsg.data[2],'N');
+	ck_assert_int_eq(stackTestFixture_getFixture(handle)->connection.connectionState, CONNECTIONSTATE_ESTABLISHED);
+
 	// finally
-	UA_free(fixture);
+	stackTestFixture_delete(handle);
 }
 END_TEST
 
 START_TEST(validCreateSessionShallCreateSession)
 {
 	// given
-	stackTestFixture* fixture = createFixture();
+	UA_Int32 handle = stackTestFixture_create(responseMsg);
 
 	UA_ByteString message_001 = { sizeof(pkt_HEL), pkt_HEL };
 	UA_ByteString message_002 = { sizeof(pkt_OPN), pkt_OPN };
 	UA_ByteString message_003 = { sizeof(pkt_MSG_CreateSession), pkt_MSG_CreateSession };
 
 	// when
-	indicateMsg(fixture, &message_001);
-	indicateMsg(fixture, &message_002);
+	indicateMsg(handle, &message_001);
+	indicateMsg(handle, &message_002);
 	UA_Int32 pos = 8;
-	UA_UInt32 secureChannelId = fixture->connection.secureChannel->securityToken.secureChannelId;
+	UA_UInt32 secureChannelId = stackTestFixture_getFixture(handle)->connection.secureChannel->securityToken.secureChannelId;
 	UA_UInt32_encodeBinary(&secureChannelId,&pos,&message_003);
-	indicateMsg(fixture, &message_003);
+	indicateMsg(handle, &message_003);
+
 	// then
-	ck_assert_int_eq(fixture->respMsg.data[0],'M');
-	ck_assert_int_eq(fixture->respMsg.data[1],'S');
-	ck_assert_int_eq(fixture->respMsg.data[2],'G');
-	ck_assert_ptr_ne(fixture->connection.secureChannel, UA_NULL);
+	ck_assert_int_eq(stackTestFixture_getFixture(handle)->respMsg.data[0],'M');
+	ck_assert_int_eq(stackTestFixture_getFixture(handle)->respMsg.data[1],'S');
+	ck_assert_int_eq(stackTestFixture_getFixture(handle)->respMsg.data[2],'G');
+	ck_assert_ptr_ne(stackTestFixture_getFixture(handle)->connection.secureChannel, UA_NULL);
+
 	// finally
-	UA_free(fixture);
+	stackTestFixture_delete(handle);
 }
 END_TEST
 
