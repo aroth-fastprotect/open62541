@@ -14,6 +14,7 @@
 #include "opcua.h"
 #include "ua_transport.h"
 #include "ua_transport_binary.h"
+#include "ua_transport_binary_secure.h"
 #include "check.h"
 
 #define MAXMSG 512
@@ -350,17 +351,15 @@ START_TEST(validCreateSessionShallCreateSession)
 	// when
 	indicateMsg(fixture, &message_001);
 	indicateMsg(fixture, &message_002);
-	// FIXME: Dereferenzierung eines Zeigers auf unvollständigen Typen in line 355
-	// UA_Int32 pos = 8;
-	// UA_UInt32 secureChannelId = fixture->connection.secureChannel->securityToken.secureChannelId;
-	// UA_UInt32_encodeBinary(&secureChannelId,&pos,&message_003);
+	UA_Int32 pos = 8;
+	UA_UInt32 secureChannelId = fixture->connection.secureChannel->securityToken.secureChannelId;
+	UA_UInt32_encodeBinary(&secureChannelId,&pos,&message_003);
 	indicateMsg(fixture, &message_003);
 	// then
 	ck_assert_int_eq(fixture->respMsg.data[0],'M');
 	ck_assert_int_eq(fixture->respMsg.data[1],'S');
 	ck_assert_int_eq(fixture->respMsg.data[2],'G');
-	// FIXME: check for session object
-	// ck_assert_ptr_ne(fixture->connection.secureChannel, UA_NULL);
+	ck_assert_ptr_ne(fixture->connection.secureChannel, UA_NULL);
 	// finally
 	UA_free(fixture);
 }
