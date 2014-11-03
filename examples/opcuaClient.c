@@ -272,6 +272,133 @@ UA_Int64 sendReadRequest(UA_Int32 sock, UA_UInt32 channelId, UA_UInt32 tokenId, 
 	return tic;
 }
 
+#define CHECK_STATUS(__op) \
+if(__op != UA_STATUSCODE_GOOD) { printf("failed at " #__op "\n"); return; }
+
+static void processMessage(const UA_ByteString *msg, UA_UInt32 *pos) {
+    // 1) Read in the securechannel
+    UA_UInt32 secureChannelId;
+    CHECK_STATUS(UA_UInt32_decodeBinary(msg, pos, &secureChannelId));
+/*
+    UA_SecureChannel *channel;
+    UA_SecureChannelManager_get(&server->secureChannelManager, secureChannelId, &channel);
+    */
+
+    // 2) Read the security header
+    UA_UInt32 tokenId;
+    CHECK_STATUS(UA_UInt32_decodeBinary(msg, pos, &tokenId));
+    UA_SequenceHeader sequenceHeader;
+    CHECK_STATUS(UA_SequenceHeader_decodeBinary(msg, pos, &sequenceHeader));
+    fprintf(stdout, "seqHdr=");
+    UA_SequenceHeader_print(&sequenceHeader, stdout);
+    fprintf(stdout, "\n");
+
+    /*
+    channel->sequenceNumber = sequenceHeader.sequenceNumber;
+    channel->requestId = sequenceHeader.requestId;
+    */
+    // todo
+    //UA_SecureChannel_checkSequenceNumber(channel,sequenceHeader.sequenceNumber);
+    //UA_SecureChannel_checkRequestId(channel,sequenceHeader.requestId);
+
+    // 3) Read the nodeid of the request
+    UA_ExpandedNodeId requestType;
+    CHECK_STATUS(UA_ExpandedNodeId_decodeBinary(msg, pos, &requestType));
+    if (requestType.nodeId.identifierType != UA_NODEIDTYPE_NUMERIC) {
+        UA_ExpandedNodeId_deleteMembers(&requestType); // if the nodeidtype is numeric, we do not have to free anything
+        return;
+    }
+
+    printf("node id type %i, %i\n", requestType.nodeId.identifierType, requestType.nodeId.identifier.numeric);
+
+    UA_ReadResponse rr;
+    UA_ReadResponse_init(&rr);
+    CHECK_STATUS(UA_ReadResponse_decodeBinary(msg, pos, &rr));
+
+    fprintf(stdout, "respHdr=");
+    UA_ResponseHeader_print(&rr.responseHeader, stdout);
+    fprintf(stdout, "\n");
+    for(int n = 0; n < rr.resultsSize; n++)
+    {
+        fprintf(stdout, "result[%i]=", n);
+        UA_DataValue_print(&rr.results[n], stdout);
+        fprintf(stdout, "\n");
+        /*
+        printf("result[%i]=%i (status %i)\n", n, 
+            rr.results[n].value.storageType, 
+            rr.results[n].value.storageType,
+            rr.results[n].status);
+            */
+    }
+    for(int n = 0; n < rr.diagnosticInfosSize; n++)
+    {
+        fprintf(stdout, "diag[%i]=", n);
+        UA_DiagnosticInfo_print(&rr.diagnosticInfos[n], stdout);
+        fprintf(stdout, "\n");
+
+    }
+}
+
+
+void processBinaryMessage(const UA_ByteString *msg)
+{
+    UA_Int32  retval = UA_STATUSCODE_GOOD;
+    UA_UInt32 pos = 0;
+    UA_TcpMessageHeader tcpMessageHeader;
+
+    // todo: test how far pos advanced must be equal to what is said in the messageheader
+    do {
+        retval = UA_TcpMessageHeader_decodeBinary(msg, &pos, &tcpMessageHeader);
+        UA_UInt32 targetpos = pos - 8 + tcpMessageHeader.messageSize;
+        if (retval == UA_STATUSCODE_GOOD) {
+            // none of the process-functions returns an error its all contained inside.
+            switch (tcpMessageHeader.messageType) {
+            case UA_MESSAGETYPE_HEL:
+                //processHello(connection, msg, &pos);
+                break;
+
+            case UA_MESSAGETYPE_OPN:
+                //processOpen(connection, server, msg, &pos);
+                break;
+
+            case UA_MESSAGETYPE_MSG:
+                //no break
+                // if this fails, the connection is closed (no break on the case)
+                printf("got msg\n");
+                processMessage(msg, &pos);
+#if 0
+                if (connection->state == UA_CONNECTION_ESTABLISHED &&
+                    connection->channel != UA_NULL) {
+                    processMessage(connection, server, msg, &pos);
+                    break;
+                }
+#endif // 0
+                break;
+
+            case UA_MESSAGETYPE_CLO:
+                /*
+                connection->state = UA_CONNECTION_CLOSING;
+                processClose(connection, server, msg, &pos);
+                connection->close(connection->callbackHandle);
+                */
+                return;
+            }
+            UA_TcpMessageHeader_deleteMembers(&tcpMessageHeader);
+        }
+        else {
+            printf("TL_Process - ERROR: decoding of header failed \n");
+            //connection->state = UA_CONNECTION_CLOSING;
+            //processClose(connection, server, msg, &pos);
+            //connection->close(connection->callbackHandle);
+        }
+        // todo: more than one message at once..
+        if (pos != targetpos) {
+            printf("The message size was not as announced or an error occurred while processing, skipping to the end of the message.\n");
+            pos = targetpos;
+        }
+    } while (msg->length > (UA_Int32)pos);
+}
+
 int main(int argc, char *argv[]) {
 	int sock;
 	struct sockaddr_in server;
@@ -305,7 +432,7 @@ int main(int argc, char *argv[]) {
 	UA_UInt32 tries;
 	UA_Boolean alwaysSameNode;
 	if(argv[1] == UA_NULL)
-		nodesToReadSize = 1;
+		nodesToReadSize = 20;
 	else
 		nodesToReadSize = atoi(argv[1]);
 
@@ -374,10 +501,7 @@ int main(int argc, char *argv[]) {
     UA_Array_new((void**)&nodesToRead,nodesToReadSize,&UA_TYPES[UA_NODEID]);
 
 	for(UA_UInt32 i = 0; i<nodesToReadSize; i++) {
-		if(alwaysSameNode)
-			nodesToRead[i].identifier.numeric = 2253; //ask always the same node
-		else
-			nodesToRead[i].identifier.numeric = 19000 +i;
+		nodesToRead[i].identifier.numeric = 2250 + i; //ask always the same node
 		nodesToRead[i].identifierType = UA_NODEIDTYPE_NUMERIC;
 		nodesToRead[i].namespaceIndex = 0;
 	}
@@ -392,6 +516,10 @@ int main(int argc, char *argv[]) {
 		tic = sendReadRequest(sock, secureChannelId, openSecChannelRsp.securityToken.tokenId, 54+i, 4+i,
                               createSessionResponse.authenticationToken,nodesToReadSize,nodesToRead);
 		received = recv(sock, reply.data, 2000, 0);
+        reply.length = received;
+
+        processBinaryMessage(&reply);
+
 		toc = UA_DateTime_now() - tic;
 		timeDiffs[i] = (UA_Double)toc/(UA_Double)1e4;
 		sum = sum + timeDiffs[i];
@@ -405,17 +533,20 @@ int main(int argc, char *argv[]) {
 
 	//save to file
 	char data[100];
-	const char flag = 'a';
-	FILE* fHandle =  fopen(argv[3], &flag);
-	//header
+	const char * flag = "a";
+	FILE* fHandle =  fopen(argv[3], flag);
+    if(fHandle)
+    {
+	    //header
 
-	UA_Int32 bytesToWrite = sprintf(data, "measurement %s in ms, nodesToRead %d \n", argv[3], nodesToReadSize);
-	fwrite(data,1,bytesToWrite,fHandle);
-	for(UA_UInt32 i=0;i<tries;i++) {
-		bytesToWrite = sprintf(data,"%16.10f \n",timeDiffs[i]);
-		fwrite(data,1,bytesToWrite,fHandle);
-	}
-	fclose(fHandle);
+	    UA_Int32 bytesToWrite = sprintf(data, "measurement %s in ms, nodesToRead %d \n", argv[3], nodesToReadSize);
+	    fwrite(data,1,bytesToWrite,fHandle);
+	    for(UA_UInt32 i=0;i<tries;i++) {
+		    bytesToWrite = sprintf(data,"%16.10f \n",timeDiffs[i]);
+		    fwrite(data,1,bytesToWrite,fHandle);
+	    }
+	    fclose(fHandle);
+    }
 
     UA_OpenSecureChannelResponse_deleteMembers(&openSecChannelRsp);
 	UA_String_delete(endpointUrl);
@@ -424,7 +555,11 @@ int main(int argc, char *argv[]) {
     UA_free(timeDiffs);
 	UA_CreateSessionResponse_deleteMembers(&createSessionResponse);
 
+#ifdef _WIN32
+    closesocket(sock);
+#else
 	close(sock);
+#endif
 
 	return 0;
 }
