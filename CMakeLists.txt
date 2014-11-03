@@ -64,7 +64,7 @@ if(ENABLE_SELFSIGNED)
     SET(lib_sources ${lib_sources} ${PROJECT_BINARY_DIR}/localhost.der ${PROJECT_BINARY_DIR}/ca.crt)
     add_custom_command(OUTPUT ${PROJECT_BINARY_DIR}/localhost.der
                               ${PROJECT_BINARY_DIR}/ca.crt
-                   COMMAND python ${PROJECT_SOURCE_DIR}/tools/certs/create_self-signed.py ${PROJECT_BINARY_DIR}
+                   COMMAND c:/python27/python ${PROJECT_SOURCE_DIR}/tools/certs/create_self-signed.py ${PROJECT_BINARY_DIR}
                    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tools/certs/create_self-signed.py
                            ${CMAKE_CURRENT_SOURCE_DIR}/tools/certs/localhost.cnf)
 endif()
@@ -113,8 +113,9 @@ else()
     list(APPEND lib_sources src/server/ua_nodestore.c)
 endif()
 
-add_library(open62541-objects OBJECT ${lib_sources}) # static version that exports all symbols
-add_library(open62541 SHARED $<TARGET_OBJECTS:open62541-objects>)
+#add_library(open62541-objects OBJECT ${lib_sources}) # static version that exports all symbols
+#add_library(open62541 SHARED $<TARGET_OBJECTS:open62541-objects>)
+add_library(open62541 SHARED ${lib_sources})
 target_compile_definitions(open62541 INTERFACE
   $<$<STREQUAL:$<TARGET_PROPERTY:TYPE>,SHARED_LIBRARY>:open62541_EXPORTS> # the UA_EXPORT macro is different when building the lib or using the lib
 )
@@ -139,19 +140,19 @@ file(MAKE_DIRECTORY "${PROJECT_BINARY_DIR}/src_generated")
 include_directories("${PROJECT_BINARY_DIR}/src_generated") 
 add_custom_command(OUTPUT ${PROJECT_BINARY_DIR}/src_generated/ua_types_generated.c
                           ${PROJECT_BINARY_DIR}/src_generated/ua_types_generated.h
-                   COMMAND python ${PROJECT_SOURCE_DIR}/tools/generate_builtin.py --export-prototypes ${generate_src_options} ${PROJECT_SOURCE_DIR}/tools/schema/Opc.Ua.Types.bsd ${PROJECT_BINARY_DIR}/src_generated/ua_types_generated
+                   COMMAND c:/python27/python ${PROJECT_SOURCE_DIR}/tools/generate_builtin.py --export-prototypes ${generate_src_options} ${PROJECT_SOURCE_DIR}/tools/schema/Opc.Ua.Types.bsd ${PROJECT_BINARY_DIR}/src_generated/ua_types_generated
                    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_builtin.py
                            ${CMAKE_CURRENT_SOURCE_DIR}/tools/schema/Opc.Ua.Types.bsd)
 
 add_custom_command(OUTPUT ${PROJECT_BINARY_DIR}/src_generated/ua_namespace_0.c
                           ${PROJECT_BINARY_DIR}/src_generated/ua_namespace_0.h
-                   COMMAND python ${PROJECT_SOURCE_DIR}/tools/generate_namespace.py ${generate_src_options} ${PROJECT_SOURCE_DIR}/tools/schema/NodeIds.csv ${PROJECT_BINARY_DIR}/src_generated/ua_namespace_0
+                   COMMAND c:/python27/python ${PROJECT_SOURCE_DIR}/tools/generate_namespace.py ${generate_src_options} ${PROJECT_SOURCE_DIR}/tools/schema/NodeIds.csv ${PROJECT_BINARY_DIR}/src_generated/ua_namespace_0
                    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_namespace.py
                            ${CMAKE_CURRENT_SOURCE_DIR}/tools/schema/NodeIds.csv)
 
 add_custom_command(OUTPUT ${PROJECT_BINARY_DIR}/src_generated/ua_transport_generated.c
                           ${PROJECT_BINARY_DIR}/src_generated/ua_transport_generated.h
-                   COMMAND python ${PROJECT_SOURCE_DIR}/tools/generate_builtin.py --additional-includes=ua_transport.h ${PROJECT_SOURCE_DIR}/tools/schema/Custom.Opc.Ua.Transport.bsd ${PROJECT_BINARY_DIR}/src_generated/ua_transport_generated
+                   COMMAND c:/python27/python ${PROJECT_SOURCE_DIR}/tools/generate_builtin.py --additional-includes=ua_transport.h ${PROJECT_SOURCE_DIR}/tools/schema/Custom.Opc.Ua.Transport.bsd ${PROJECT_BINARY_DIR}/src_generated/ua_transport_generated
                    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_namespace.py
                            ${CMAKE_CURRENT_SOURCE_DIR}/tools/schema/Custom.Opc.Ua.Transport.bsd)
 
