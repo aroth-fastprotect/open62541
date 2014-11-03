@@ -24,14 +24,16 @@
 
 static UA_StatusCode parseVariableNode(UA_ExtensionObject *attributes, UA_Node **new_node,
                                        const UA_VTable_Entry **vt) {
-    if(attributes->typeId.identifier.numeric != 357) // VariableAttributes_Encoding_DefaultBinary,357,Object
+    if(attributes->typeId.identifier.numeric != 357) { // VariableAttributes_Encoding_DefaultBinary,357,Object
         return UA_STATUSCODE_BADNODEATTRIBUTESINVALID;
+    }
 
     UA_VariableAttributes attr;
     UA_UInt32 pos = 0;
     // todo return more informative error codes from decodeBinary
-    if(UA_VariableAttributes_decodeBinary(&attributes->body, &pos, &attr) != UA_STATUSCODE_GOOD)
+    if(UA_VariableAttributes_decodeBinary(&attributes->body, &pos, &attr) != UA_STATUSCODE_GOOD) {
         return UA_STATUSCODE_BADNODEATTRIBUTESINVALID;
+    }
 
     UA_VariableNode *vnode = UA_VariableNode_new();
     if(!vnode) {

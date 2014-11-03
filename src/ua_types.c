@@ -37,7 +37,7 @@ void UA_Boolean_print(const UA_Boolean *p, FILE *stream) {
 UA_TYPE_DEFAULT(UA_SByte)
 #ifdef DEBUG
 void UA_SByte_print(const UA_SByte *p, FILE *stream) {
-    if(!p || !stream) return;
+    if(!p || !stream) { return; }
     UA_SByte x = *p;
     fprintf(stream, "%s%x\n", x < 0 ? "-" : "", x < 0 ? -x : x);
 }
@@ -205,7 +205,7 @@ UA_Boolean UA_String_equal(const UA_String *string1, const UA_String *string2) {
     if(string1->length <= 0 && string2->length <= 0)
         return UA_TRUE;
     if(string1->length != string2->length)
-        return UA_FALSE;
+        { return UA_FALSE; }
 
     // casts are needed to overcome signed warnings
     UA_Int32 is = strncmp((char const *)string1->data, (char const *)string2->data, string1->length);
@@ -1051,7 +1051,7 @@ void UA_Array_delete(void *p, UA_Int32 noElements, const UA_VTable_Entry *vt) {
 UA_StatusCode UA_Array_copy(const void *src, UA_Int32 noElements, const UA_VTable_Entry *vt, void **dst) {
     UA_StatusCode retval = UA_Array_new(dst, noElements, vt);
     if(retval)
-        return retval;
+        { return retval; }
 
     UA_Byte *csrc = (UA_Byte *)src; // so compilers allow pointer arithmetic
     UA_Byte *cdst = (UA_Byte *)*dst;

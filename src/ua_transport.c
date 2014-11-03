@@ -23,8 +23,9 @@ UA_StatusCode UA_MessageType_encodeBinary(UA_MessageType const *src, UA_ByteStri
 }
 
 UA_StatusCode UA_MessageType_decodeBinary(UA_ByteString const *src, UA_UInt32 *offset, UA_MessageType *dst) {
-    if(*offset+3 > (UA_UInt32)src->length)
+    if(*offset+3 > (UA_UInt32)src->length) {
         return UA_STATUSCODE_BADDECODINGERROR;
+    }
     UA_StatusCode retval = UA_STATUSCODE_GOOD;
     UA_Byte tmpBuf[3];
     retval |= UA_Byte_decodeBinary(src, offset, &(tmpBuf[0])); //messageType to Byte representation

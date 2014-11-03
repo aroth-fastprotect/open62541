@@ -15,7 +15,7 @@ static INLINE UA_Boolean is_builtin(const UA_NodeId *typeid ) {
 /** The data-pointer may be null. Then the array is assumed to be empy. */
 UA_UInt32 UA_Array_calcSizeBinary(UA_Int32 length, const UA_VTable_Entry *vt, const void *data) {
     if(!data) //empty arrays are encoded with the length member either 0 or -1
-        return sizeof(UA_Int32);
+    { return sizeof(UA_Int32); }
 
     UA_UInt32 l  = sizeof(UA_Int32);
     UA_UInt32 memSize = vt->memSize;
@@ -39,8 +39,9 @@ static UA_UInt32 UA_Array_calcSizeBinary_asExtensionObject(UA_Int32 length, cons
 UA_StatusCode UA_Array_encodeBinary(const void *src, UA_Int32 length, const UA_VTable_Entry *vt,
                                     UA_ByteString *dst, UA_UInt32 *offset) {
     //Null Arrays are encoded with length = -1 // part 6 - §5.24
-    if(length < -1)
-        length = -1;
+    if(length < -1) {
+        length = -1; 
+    }
 
     UA_StatusCode retval   = UA_Int32_encodeBinary(&length, dst, offset);
     const UA_Byte *csrc    = (const UA_Byte *)src;
@@ -55,8 +56,9 @@ UA_StatusCode UA_Array_encodeBinary(const void *src, UA_Int32 length, const UA_V
 static UA_StatusCode UA_Array_encodeBinary_asExtensionObject(const void *src, UA_Int32 length, const UA_VTable_Entry *vt,
                                                              UA_ByteString *dst, UA_UInt32 *offset) {
     //Null Arrays are encoded with length = -1 // part 6 - §5.24
-    if(length < -1)
+    if (length < -1) {
         length = -1;
+    }
 
     UA_StatusCode retval = UA_Int32_encodeBinary(&length, dst, offset);
     const UA_Byte *csrc = (const UA_Byte *)src;
@@ -85,8 +87,9 @@ UA_StatusCode UA_Array_decodeBinary(const UA_ByteString *src, UA_UInt32 *offset,
     }
 
     UA_StatusCode retval = UA_Array_new(dst, length, vt);
-    if(retval)
+    if(retval) {
         return retval;
+    }
     
     UA_Byte  *arr     = (UA_Byte *)*dst;
     UA_Int32  i       = 0;
@@ -199,8 +202,9 @@ UA_TYPE_DECODEBINARY(UA_Int32,
 UA_TYPE_CALCSIZEBINARY_SIZEOF(UA_UInt32)
 UA_TYPE_ENCODEBINARY(UA_UInt32, retval = UA_Int32_encodeBinary((UA_Int32 const *)src, dst, offset); )
 UA_TYPE_DECODEBINARY(UA_UInt32,
-                     if(*offset + sizeof(UA_UInt32) > (UA_UInt32)src->length )
+                     if(*offset + sizeof(UA_UInt32) > (UA_UInt32)src->length ) {
                          return UA_STATUSCODE_BADDECODINGERROR;
+                     }
                      UA_UInt32 t1 = (UA_UInt32)((UA_Byte)(src->data[(*offset)++] & 0xFF));
                      UA_UInt32 t2 = (UA_UInt32)((UA_Byte)(src->data[(*offset)++]& 0xFF) << 8);
                      UA_UInt32 t3 = (UA_UInt32)((UA_Byte)(src->data[(*offset)++]& 0xFF) << 16);
@@ -234,8 +238,9 @@ UA_TYPE_DECODEBINARY(UA_Int64,
 UA_TYPE_CALCSIZEBINARY_SIZEOF(UA_UInt64)
 UA_TYPE_ENCODEBINARY(UA_UInt64, return UA_Int64_encodeBinary((UA_Int64 const *)src, dst, offset); )
 UA_TYPE_DECODEBINARY(UA_UInt64,
-                     if(*offset + sizeof(UA_UInt64) > (UA_UInt32)src->length )
+                     if(*offset + sizeof(UA_UInt64) > (UA_UInt32)src->length ) {
                          return UA_STATUSCODE_BADDECODINGERROR;
+                     }
                      UA_UInt64 t1 = (UA_UInt64)src->data[(*offset)++];
                      UA_UInt64 t2 = (UA_UInt64)src->data[(*offset)++] << 8;
                      UA_UInt64 t3 = (UA_UInt64)src->data[(*offset)++] << 16;
@@ -251,8 +256,9 @@ UA_TYPE_CALCSIZEBINARY_SIZEOF(UA_Float)
 // FIXME: Implement NaN, Inf and Zero(s)
 UA_Byte UA_FLOAT_ZERO[] = { 0x00, 0x00, 0x00, 0x00 };
 UA_TYPE_DECODEBINARY(UA_Float,
-                     if(*offset + sizeof(UA_Float) > (UA_UInt32)src->length )
+                     if(*offset + sizeof(UA_Float) > (UA_UInt32)src->length ) {
                          return UA_STATUSCODE_BADDECODINGERROR;
+                     }
                      UA_Float mantissa;
                      UA_UInt32 biasedExponent;
                      UA_Float sign;
@@ -277,8 +283,9 @@ UA_TYPE_CALCSIZEBINARY_SIZEOF(UA_Double)
 // FIXME: Implement NaN, Inf and Zero(s)
 UA_Byte UA_DOUBLE_ZERO[] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
 UA_TYPE_DECODEBINARY(UA_Double,
-                     if(*offset + sizeof(UA_Double) > (UA_UInt32)src->length )
+                     if(*offset + sizeof(UA_Double) > (UA_UInt32)src->length ) {
                          return UA_STATUSCODE_BADDECODINGERROR;
+                     }
                      UA_Double sign;
                      UA_Double mantissa;
                      UA_UInt32 biasedExponent;
@@ -317,8 +324,9 @@ UA_UInt32 UA_String_calcSizeBinary(UA_String const *string) {
 }
 
 UA_StatusCode UA_String_encodeBinary(UA_String const *src, UA_ByteString *dst, UA_UInt32 *offset) {
-    if((UA_Int32)(*offset + UA_String_calcSizeBinary(src)) > dst->length)
+    if((UA_Int32)(*offset + UA_String_calcSizeBinary(src)) > dst->length) {
         return UA_STATUSCODE_BADENCODINGERROR;
+    }
 
     UA_StatusCode retval = UA_Int32_encodeBinary(&src->length, dst, offset);
     if(src->length > 0) {
@@ -566,8 +574,9 @@ UA_TYPE_ENCODEBINARY(UA_ExpandedNodeId,
 UA_StatusCode UA_ExpandedNodeId_decodeBinary(UA_ByteString const *src, UA_UInt32 *offset, UA_ExpandedNodeId *dst) {
     UA_ExpandedNodeId_init(dst);
     // get encodingflags and leave a "clean" nodeidtype
-    if((UA_Int32)*offset >= src->length)
+    if((UA_Int32)*offset >= src->length) {
         return UA_STATUSCODE_BADDECODINGERROR;
+    }
 
     // prepare decoding of the nodeid
     UA_Byte encodingByte = src->data[*offset];
@@ -893,8 +902,9 @@ UA_StatusCode UA_Variant_decodeBinary(UA_ByteString const *src, UA_UInt32 *offse
     UA_Variant_init(dst);
     UA_Byte encodingByte;
     UA_StatusCode retval = UA_Byte_decodeBinary(src, offset, &encodingByte);
-    if(retval)
+    if(retval) {
         return retval;
+    }
 
     UA_VariantData *data = &dst->storage.data;
     UA_Boolean isArray = encodingByte & UA_VARIANT_ENCODINGMASKTYPE_ARRAY;

@@ -58,8 +58,9 @@ static UA_Boolean isRelevantTargetNode(UA_NodeStore *ns, const UA_BrowseDescript
     if(reference->isInverse == UA_TRUE && browseDescription->browseDirection == UA_BROWSEDIRECTION_FORWARD)
         return UA_FALSE;
 
-    else if(reference->isInverse == UA_FALSE && browseDescription->browseDirection == UA_BROWSEDIRECTION_INVERSE)
+    else if(reference->isInverse == UA_FALSE && browseDescription->browseDirection == UA_BROWSEDIRECTION_INVERSE) {
         return UA_FALSE;
+    }
 
     // 2) Test if the reference type is relevant
     UA_Boolean isRelevant = returnAll;
@@ -97,8 +98,9 @@ static UA_StatusCode findRelevantReferenceTypes(UA_NodeStore *ns, const UA_NodeI
     UA_UInt32 currentLastIndex = 0;
     UA_UInt32 currentArraySize = 20; // should be more than enough. if not, increase the array size.
     UA_NodeId *typeArray = UA_alloc(sizeof(UA_NodeId) * currentArraySize);
-    if(!typeArray)
+    if(!typeArray) {
         return UA_STATUSCODE_BADOUTOFMEMORY;
+    }
 
     UA_StatusCode retval = UA_STATUSCODE_GOOD;
     retval |= UA_NodeId_copy(rootReferenceType, &typeArray[0]);
