@@ -4,7 +4,9 @@
 
 #cmakedefine ENABLE_MULTITHREADING
 #cmakedefine MSVC
+#ifndef WIN32
 #cmakedefine WIN32
+#endif // WIN32
 
 /* Visibility */
 #ifdef MSVC

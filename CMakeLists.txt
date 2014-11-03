@@ -8,6 +8,10 @@ set(open62541_VERSION_MINOR 1)
 set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -DDEBUG")
 
+if(msvc)
+	add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+endif()
+
 # main sources of libopen62541
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/include")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/src")
@@ -163,7 +167,11 @@ if(CLIENT)
 	add_definitions( -DBENCHMARK=1 )
     # the client is built directly with the .o files as it currently uses
     # internal functions that are not exported to the shared lib.
-	add_executable(exampleClient $<TARGET_OBJECTS:open62541-objects> examples/opcuaClient.c)
+	add_executable(exampleClient examples/opcuaClient.c)
+	target_link_libraries(exampleClient open62541)
+	if(WIN32)
+		target_link_libraries(exampleClient ws2_32)
+	endif(WIN32)
 endif()
 
 # build example server

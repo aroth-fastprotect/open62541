@@ -6,9 +6,14 @@
  */
 #include <stdio.h> //printf
 #include <string.h> //strlen
+#ifndef _WIN32
 #include <sys/socket.h> //socket
 #include <arpa/inet.h> //inet_addr
 #include <unistd.h> // for close
+#else
+#define WIN32_LEAN_AND_MEAN
+#include <winsock2.h>
+#endif
 #include <stdlib.h> // pulls in declaration of malloc, free
 #include "ua_transport_generated.h"
 #include "ua_namespace_0.h"
@@ -273,6 +278,17 @@ int main(int argc, char *argv[]) {
 
 	UA_ByteString reply;
 	UA_ByteString_newMembers(&reply, 65536);
+
+#ifdef _WIN32
+    int iResult;
+    WSADATA wsaData;
+    // Initialize Winsock
+    iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
+    if (iResult != 0) {
+        printf("WSAStartup failed: %d\n", iResult);
+        return 1;
+    }
+#endif
 
 	//start parameters
 	if(argc < 7) {

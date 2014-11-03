@@ -37,17 +37,17 @@
  */
 
 #define UA_TYPE_CALCSIZEBINARY_AS(TYPE, TYPE_AS)       \
-    UA_UInt32 TYPE##_calcSizeBinary(TYPE const *p) {    \
+    UA_EXPORT UA_UInt32 TYPE##_calcSizeBinary(TYPE const *p) {    \
         return TYPE_AS##_calcSizeBinary((TYPE_AS *)p); \
     }
 
 #define UA_TYPE_ENCODEBINARY_AS(TYPE, TYPE_AS)                          \
-    UA_StatusCode TYPE##_encodeBinary(TYPE const *src, UA_ByteString *dst, UA_UInt32 *offset) { \
+    UA_EXPORT UA_StatusCode TYPE##_encodeBinary(TYPE const *src, UA_ByteString *dst, UA_UInt32 *offset) { \
         return TYPE_AS##_encodeBinary((TYPE_AS *)src, dst, offset);     \
     }
 
 #define UA_TYPE_DECODEBINARY_AS(TYPE, TYPE_AS)                                             \
-    UA_StatusCode TYPE##_decodeBinary(UA_ByteString const *src, UA_UInt32 *offset, TYPE *dst) { \
+    UA_EXPORT UA_StatusCode TYPE##_decodeBinary(UA_ByteString const *src, UA_UInt32 *offset, TYPE *dst) { \
         return TYPE_AS##_decodeBinary(src, offset, (TYPE_AS *)dst);                        \
     }
 #define UA_TYPE_BINARY_ENCODING_AS(TYPE, TYPE_AS) \
@@ -56,9 +56,9 @@
     UA_TYPE_DECODEBINARY_AS(TYPE, TYPE_AS)
 
 #define UA_TYPE_BINARY_ENCODING(TYPE)                                                     \
-    UA_UInt32 TYPE##_calcSizeBinary(TYPE const *p);                                        \
-    UA_StatusCode TYPE##_encodeBinary(TYPE const *src, UA_ByteString *dst, UA_UInt32 *offset); \
-    UA_StatusCode TYPE##_decodeBinary(UA_ByteString const *src, UA_UInt32 *offset, TYPE *dst);
+    UA_EXPORT UA_UInt32 TYPE##_calcSizeBinary(TYPE const *p);                                        \
+    UA_EXPORT UA_StatusCode TYPE##_encodeBinary(TYPE const *src, UA_ByteString *dst, UA_UInt32 *offset); \
+    UA_EXPORT UA_StatusCode TYPE##_decodeBinary(UA_ByteString const *src, UA_UInt32 *offset, TYPE *dst);
 
 UA_TYPE_BINARY_ENCODING(UA_Boolean)
 UA_TYPE_BINARY_ENCODING(UA_SByte)
@@ -94,14 +94,14 @@ UA_TYPE_BINARY_ENCODING(UA_InvalidType)
 /*********/
 
 /* Computes the size of an array (incl. length field) in a binary blob. */
-UA_UInt32 UA_Array_calcSizeBinary(UA_Int32 length, const UA_VTable_Entry *vt, const void *data);
+UA_EXPORT UA_UInt32 UA_Array_calcSizeBinary(UA_Int32 length, const UA_VTable_Entry *vt, const void *data);
 
 /* @brief Encodes an array into a binary blob. The array size is printed as well. */
-UA_StatusCode UA_Array_encodeBinary(const void *src, UA_Int32 length, const UA_VTable_Entry *vt,
+UA_EXPORT UA_StatusCode UA_Array_encodeBinary(const void *src, UA_Int32 length, const UA_VTable_Entry *vt,
                                     UA_ByteString *dst, UA_UInt32 *offset);
 
 /* @brief Decodes an array from a binary blob. The array is allocated automatically before decoding. */
-UA_StatusCode UA_Array_decodeBinary(const UA_ByteString *src, UA_UInt32 *offset, UA_Int32 length,
+UA_EXPORT UA_StatusCode UA_Array_decodeBinary(const UA_ByteString *src, UA_UInt32 *offset, UA_Int32 length,
                                     const UA_VTable_Entry *vt, void **dst);
 
 /// @} /* end of group */
