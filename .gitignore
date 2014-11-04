@@ -35,7 +35,6 @@ config.log
 /depcomp
 /ltmain.sh
 /autogen.sh
-/configure
 /missing
 /html
 /doc/html/*
@@ -70,3 +69,6 @@ tests/check_memory
 tests/check_namespace
 tests/coverage
 /build-*
+/.kdev4/
+/build/
+*.kdev4
