@@ -19,6 +19,31 @@
 #include "ua_namespace_0.h"
 #include "ua_util.h"
 
+enum UA_AttributeId {
+    UA_ATTRIBUTEID_NODEID                  = 1,
+    UA_ATTRIBUTEID_NODECLASS               = 2,
+    UA_ATTRIBUTEID_BROWSENAME              = 3,
+    UA_ATTRIBUTEID_DISPLAYNAME             = 4,
+    UA_ATTRIBUTEID_DESCRIPTION             = 5,
+    UA_ATTRIBUTEID_WRITEMASK               = 6,
+    UA_ATTRIBUTEID_USERWRITEMASK           = 7,
+    UA_ATTRIBUTEID_ISABSTRACT              = 8,
+    UA_ATTRIBUTEID_SYMMETRIC               = 9,
+    UA_ATTRIBUTEID_INVERSENAME             = 10,
+    UA_ATTRIBUTEID_CONTAINSNOLOOPS         = 11,
+    UA_ATTRIBUTEID_EVENTNOTIFIER           = 12,
+    UA_ATTRIBUTEID_VALUE                   = 13,
+    UA_ATTRIBUTEID_DATATYPE                = 14,
+    UA_ATTRIBUTEID_VALUERANK               = 15,
+    UA_ATTRIBUTEID_ARRAYDIMENSIONS         = 16,
+    UA_ATTRIBUTEID_ACCESSLEVEL             = 17,
+    UA_ATTRIBUTEID_USERACCESSLEVEL         = 18,
+    UA_ATTRIBUTEID_MINIMUMSAMPLINGINTERVAL = 19,
+    UA_ATTRIBUTEID_HISTORIZING             = 20,
+    UA_ATTRIBUTEID_EXECUTABLE              = 21,
+    UA_ATTRIBUTEID_USEREXECUTABLE          = 22
+};
+
 UA_Int32 sendHello(UA_Int32 sock, UA_String *endpointURL) {
 
 	UA_TcpMessageHeader messageHeader;
@@ -238,7 +263,7 @@ UA_Int64 sendReadRequest(UA_Int32 sock, UA_UInt32 channelId, UA_UInt32 tokenId, 
 	rq.nodesToReadSize = nodeIds_size;
 	for(UA_Int32 i=0;i<nodeIds_size;i++) {
 		UA_ReadValueId_init(&(rq.nodesToRead[i]));
-		rq.nodesToRead[i].attributeId = 6; //WriteMask
+		rq.nodesToRead[i].attributeId = UA_ATTRIBUTEID_VALUE;
 		UA_NodeId_init(&(rq.nodesToRead[i].nodeId));
 		rq.nodesToRead[i].nodeId = nodeIds[i];
 		UA_QualifiedName_init(&(rq.nodesToRead[0].dataEncoding));
@@ -276,6 +301,9 @@ UA_Int64 sendReadRequest(UA_Int32 sock, UA_UInt32 channelId, UA_UInt32 tokenId, 
 if(__op != UA_STATUSCODE_GOOD) { printf("failed at " #__op "\n"); return; }
 
 static void processMessage(const UA_ByteString *msg, UA_UInt32 *pos) {
+
+    UA_String_printx_hex("msg=", msg);
+
     // 1) Read in the securechannel
     UA_UInt32 secureChannelId;
     CHECK_STATUS(UA_UInt32_decodeBinary(msg, pos, &secureChannelId));
@@ -289,7 +317,7 @@ static void processMessage(const UA_ByteString *msg, UA_UInt32 *pos) {
     CHECK_STATUS(UA_UInt32_decodeBinary(msg, pos, &tokenId));
     UA_SequenceHeader sequenceHeader;
     CHECK_STATUS(UA_SequenceHeader_decodeBinary(msg, pos, &sequenceHeader));
-    fprintf(stdout, "seqHdr=");
+    fprintf(stdout, "pos=%i seqHdr=", *pos);
     UA_SequenceHeader_print(&sequenceHeader, stdout);
     fprintf(stdout, "\n");
 
@@ -303,25 +331,39 @@ static void processMessage(const UA_ByteString *msg, UA_UInt32 *pos) {
 
     // 3) Read the nodeid of the request
     UA_ExpandedNodeId requestType;
+    UA_ExpandedNodeId_init(&requestType);
     CHECK_STATUS(UA_ExpandedNodeId_decodeBinary(msg, pos, &requestType));
     if (requestType.nodeId.identifierType != UA_NODEIDTYPE_NUMERIC) {
         UA_ExpandedNodeId_deleteMembers(&requestType); // if the nodeidtype is numeric, we do not have to free anything
         return;
     }
 
-    printf("node id type %i, %i\n", requestType.nodeId.identifierType, requestType.nodeId.identifier.numeric);
+    fprintf(stdout, "pos=%i requestType=", *pos);
+    UA_ExpandedNodeId_print(&requestType, stdout);
+    fprintf(stdout, "\n");
 
     UA_ReadResponse rr;
     UA_ReadResponse_init(&rr);
     CHECK_STATUS(UA_ReadResponse_decodeBinary(msg, pos, &rr));
 
-    fprintf(stdout, "respHdr=");
+    fprintf(stdout, "pos=%i respHdr=", *pos);
     UA_ResponseHeader_print(&rr.responseHeader, stdout);
+    fprintf(stdout, "\n");
+
+    fprintf(stdout, "results=");
+    UA_Array_print(rr.results, rr.resultsSize, &UA_TYPES[UA_DATAVALUE], stdout);
     fprintf(stdout, "\n");
     for(int n = 0; n < rr.resultsSize; n++)
     {
+        UA_Variant * v = &rr.results[n].value;
+
+        UA_UInt32 * d = v->storage.data.dataPtr;
+        fprintf(stdout, "result_data[%i]=%i:%p, %x\n", n, v->storage.data.arrayLength, v->storage.data.dataPtr, (d != 0)?*d:0);
+
+
         fprintf(stdout, "result[%i]=", n);
-        UA_DataValue_print(&rr.results[n], stdout);
+        //UA_DataValue_print(&rr.results[n], stdout);
+        UA_Variant_print(v, stdout);
         fprintf(stdout, "\n");
         /*
         printf("result[%i]=%i (status %i)\n", n, 
@@ -501,10 +543,32 @@ int main(int argc, char *argv[]) {
     UA_Array_new((void**)&nodesToRead,nodesToReadSize,&UA_TYPES[UA_NODEID]);
 
 	for(UA_UInt32 i = 0; i<nodesToReadSize; i++) {
-		nodesToRead[i].identifier.numeric = 2250 + i; //ask always the same node
+        if(alwaysSameNode)
+            nodesToRead[i].identifier.numeric = 2250; //ask always the same node
+        else
+            nodesToRead[i].identifier.numeric = 2267 + i;
 		nodesToRead[i].identifierType = UA_NODEIDTYPE_NUMERIC;
 		nodesToRead[i].namespaceIndex = 0;
 	}
+
+	{
+        UA_DataValue dv;
+        UA_DataValue_init(&dv);
+        fprintf(stdout, "dv=");
+        UA_DataValue_print(&dv, stdout);
+        fprintf(stdout, "\n");
+
+        UA_Int32 dummy = 42;
+        UA_Variant_copySetValue(&dv.value, &UA_TYPES[UA_INT32], &dummy);
+
+        UA_Int32 dummy2 = *(UA_Int32 *)dv.value.storage.data.dataPtr;
+
+        fprintf(stdout, "dv=%i\n", dummy2);
+
+        fprintf(stdout, "dv=");
+        UA_DataValue_print(&dv, stdout);
+        fprintf(stdout, "\n");
+    }
 
 	UA_DateTime tic, toc;
 	UA_Double *timeDiffs;
@@ -552,7 +616,7 @@ int main(int argc, char *argv[]) {
 	UA_String_delete(endpointUrl);
 	UA_String_deleteMembers(&reply);
 	UA_Array_delete(nodesToRead,nodesToReadSize,&UA_TYPES[UA_NODEID]);
-    UA_free(timeDiffs);
+    //UA_free(timeDiffs);
 	UA_CreateSessionResponse_deleteMembers(&createSessionResponse);
 
 #ifdef _WIN32
